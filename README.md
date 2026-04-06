@@ -6,6 +6,7 @@ Right now the project is implemented in TypeScript and already supports:
 
 - variable declarations with `var`
 - constant declarations with `val`
+- reassignment for `var`
 - number literals
 - string literals with `"`
 - multiline strings with `` ` ``
@@ -57,6 +58,7 @@ yarn format
 
 - `var` creates mutable bindings
 - `val` creates immutable bindings
+- only `var` can be reassigned
 - normal strings must use `"`
 - multiline strings must use `` ` ``
 - `print` is treated as an identifier in the lexer and as a builtin at runtime
@@ -65,7 +67,6 @@ yarn format
 
 Possible next milestones:
 
-- assignment for mutable variables
 - arithmetic expressions
 - multiple function arguments
 - nested scopes

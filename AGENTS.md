@@ -15,6 +15,7 @@ This file tracks working conventions for the `fast` language project so future c
 
 - `var` is mutable.
 - `val` is immutable.
+- only `var` can be reassigned.
 - `print` is not a lexer keyword; it is tokenized as `IDENTIFIER`.
 - Normal strings use `"`.
 - Multiline strings use `` ` ``.

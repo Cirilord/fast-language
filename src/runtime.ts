@@ -1,4 +1,5 @@
 import type {
+  AssignmentStatement,
   CallExpression,
   Expression,
   Identifier,
@@ -39,6 +40,21 @@ export type StringValue = {
 
 class Scope {
   private readonly bindings = new Map<string, Binding>();
+
+  public assign(name: string, value: RuntimeValue): RuntimeValue {
+    const binding = this.bindings.get(name);
+
+    if (!binding) {
+      throw new Error(`'${name}' is not defined.`);
+    }
+
+    if (!binding.mutable) {
+      throw new Error(`Cannot reassign immutable binding '${name}'.`);
+    }
+
+    binding.value = value;
+    return value;
+  }
 
   public define(name: string, value: RuntimeValue, mutable: boolean): RuntimeValue {
     if (this.bindings.has(name)) {
@@ -132,8 +148,15 @@ export class Interpreter {
     };
   }
 
+  private executeAssignmentStatement(statement: AssignmentStatement): RuntimeValue {
+    const value = this.evaluateExpression(statement.value);
+    return this.scope.assign(statement.identifier.name, value);
+  }
+
   private executeStatement(statement: Statement): RuntimeValue {
     switch (statement.kind) {
+      case 'AssignmentStatement':
+        return this.executeAssignmentStatement(statement);
       case 'ExpressionStatement':
         return this.evaluateExpression(statement.expression);
       case 'VariableDeclaration':

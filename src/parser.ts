@@ -1,4 +1,5 @@
 import type {
+  AssignmentStatement,
   CallExpression,
   Expression,
   ExpressionStatement,
@@ -45,6 +46,11 @@ export class Parser {
     return this.peek().type === type;
   }
 
+  private checkNext(type: TokenType): boolean {
+    const token = this.tokens[this.current + 1];
+    return token?.type === type;
+  }
+
   private consume(type: TokenType, message: string): Token {
     if (this.check(type)) {
       return this.advance();
@@ -70,6 +76,23 @@ export class Parser {
     }
 
     return false;
+  }
+
+  private parseAssignmentStatement(): AssignmentStatement {
+    const identifier = this.consume(TokenType.Identifier, 'Expected identifier before assignment.');
+
+    this.consume(TokenType.Equals, "Expected '=' in assignment.");
+    const value = this.parseExpression();
+    this.consume(TokenType.Semicolon, "Expected ';' after assignment.");
+
+    return {
+      identifier: {
+        kind: 'Identifier',
+        name: identifier.lexeme,
+      },
+      kind: 'AssignmentStatement',
+      value,
+    };
   }
 
   private parseCallExpression(): Expression {
@@ -134,6 +157,10 @@ export class Parser {
 
     if (this.match(TokenType.Val)) {
       return this.parseVariableDeclaration('val');
+    }
+
+    if (this.check(TokenType.Identifier) && this.checkNext(TokenType.Equals)) {
+      return this.parseAssignmentStatement();
     }
 
     const expression = this.parseExpression();

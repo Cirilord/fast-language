@@ -3,7 +3,13 @@ export type Program = {
   kind: 'Program';
 };
 
-export type Statement = VariableDeclaration | ExpressionStatement;
+export type Statement = VariableDeclaration | AssignmentStatement | ExpressionStatement;
+
+export type AssignmentStatement = {
+  identifier: Identifier;
+  kind: 'AssignmentStatement';
+  value: Expression;
+};
 
 export type VariableDeclaration = {
   declarationType: 'var' | 'val';
