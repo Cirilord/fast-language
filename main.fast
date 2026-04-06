@@ -1,0 +1,5 @@
+var a = 30;
+val b = "Test";
+
+print(a);
+print(b);

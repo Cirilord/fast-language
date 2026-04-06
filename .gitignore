@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Cache files
+.eslintcache
+.prettier-cache
+
+# Editor files
+.idea/
+.vscode/*
+!.vscode/settings.json
+
+# OS files
+.DS_Store
+
+# Certificates and keys
+*.pem
