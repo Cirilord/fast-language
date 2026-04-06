@@ -10,6 +10,7 @@ import type {
   StringLiteral,
   VariableDeclaration,
 } from './ast';
+import { createSyntaxError } from './errors';
 import { TokenType, type Token } from './token';
 
 export class Parser {
@@ -59,8 +60,22 @@ export class Parser {
     throw this.error(this.peek(), message);
   }
 
+  private createIdentifier(token: Token): Identifier {
+    return {
+      kind: 'Identifier',
+      location: {
+        column: token.column,
+        line: token.line,
+      },
+      name: token.lexeme,
+    };
+  }
+
   private error(token: Token, message: string): Error {
-    return new Error(`${message} Found '${token.lexeme || token.type}' at line ${token.line}, column ${token.column}.`);
+    return createSyntaxError(`${message} Found '${token.lexeme || token.type}'`, {
+      column: token.column,
+      line: token.line,
+    });
   }
 
   private isAtEnd(): boolean {
@@ -86,10 +101,7 @@ export class Parser {
     this.consume(TokenType.Semicolon, "Expected ';' after assignment.");
 
     return {
-      identifier: {
-        kind: 'Identifier',
-        name: identifier.lexeme,
-      },
+      identifier: this.createIdentifier(identifier),
       kind: 'AssignmentStatement',
       value,
     };
@@ -127,10 +139,7 @@ export class Parser {
 
   private parsePrimary(): Expression {
     if (this.match(TokenType.Identifier)) {
-      return {
-        kind: 'Identifier',
-        name: this.previous().lexeme,
-      } satisfies Identifier;
+      return this.createIdentifier(this.previous());
     }
 
     if (this.match(TokenType.Number)) {
@@ -181,10 +190,7 @@ export class Parser {
 
     return {
       declarationType,
-      identifier: {
-        kind: 'Identifier',
-        name: name.lexeme,
-      },
+      identifier: this.createIdentifier(name),
       initializer,
       kind: 'VariableDeclaration',
     };
@@ -194,7 +200,7 @@ export class Parser {
     const token = this.tokens[this.current];
 
     if (token === undefined) {
-      throw new Error('Unexpected end of token stream while peeking.');
+      throw createSyntaxError('Unexpected end of token stream while peeking');
     }
 
     return token;
@@ -204,7 +210,7 @@ export class Parser {
     const token = this.tokens[this.current - 1];
 
     if (token === undefined) {
-      throw new Error('Unexpected start of token stream while reading previous token.');
+      throw createSyntaxError('Unexpected start of token stream while reading previous token');
     }
 
     return token;

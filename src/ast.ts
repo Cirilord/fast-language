@@ -5,6 +5,11 @@ export type Program = {
 
 export type Statement = VariableDeclaration | AssignmentStatement | ExpressionStatement;
 
+export type SourceLocation = {
+  column: number;
+  line: number;
+};
+
 export type AssignmentStatement = {
   identifier: Identifier;
   kind: 'AssignmentStatement';
@@ -27,6 +32,7 @@ export type Expression = Identifier | NumberLiteral | StringLiteral | CallExpres
 
 export type Identifier = {
   kind: 'Identifier';
+  location: SourceLocation;
   name: string;
 };
 

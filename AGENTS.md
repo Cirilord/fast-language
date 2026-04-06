@@ -7,7 +7,7 @@ This file tracks working conventions for the `fast` language project so future c
 ## Project State
 
 - The project is currently a TypeScript implementation of the `fast` language.
-- The language already has a lexer, parser, and interpreter.
+- The language already has a lexer, parser, semantic analyzer, and interpreter.
 - Runtime name resolution is currently handled through `Scope` in `src/runtime.ts`.
 - The active sample program lives in `main.fast`.
 
@@ -28,6 +28,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Prefer explicit typing and follow the ESLint rules configured in `eslint.config.mjs`.
 - Keep the TypeScript configuration aligned with `@tsconfig/strictest` in `tsconfig.json`.
 - Character classification helpers should live in `src/utils/char.ts`.
+- Semantic checks should stay centralized in `src/semantic.ts`.
 - Runtime scope behavior should stay centralized in `src/runtime.ts`.
 
 ## Documentation Rule

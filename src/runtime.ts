@@ -9,6 +9,7 @@ import type {
   StringLiteral,
   VariableDeclaration,
 } from './ast';
+import { createReferenceError, createTypeError } from './errors';
 
 type Binding = {
   mutable: boolean;
@@ -45,11 +46,11 @@ class Scope {
     const binding = this.bindings.get(name);
 
     if (!binding) {
-      throw new Error(`'${name}' is not defined.`);
+      throw createReferenceError(`Binding '${name}' is not defined`);
     }
 
     if (!binding.mutable) {
-      throw new Error(`Cannot reassign immutable binding '${name}'.`);
+      throw createTypeError(`Cannot reassign immutable binding '${name}'`);
     }
 
     binding.value = value;
@@ -58,7 +59,7 @@ class Scope {
 
   public define(name: string, value: RuntimeValue, mutable: boolean): RuntimeValue {
     if (this.bindings.has(name)) {
-      throw new Error(`'${name}' is already defined.`);
+      throw createTypeError(`Binding '${name}' is already defined`);
     }
 
     this.bindings.set(name, { mutable, value });
@@ -69,7 +70,7 @@ class Scope {
     const binding = this.bindings.get(name);
 
     if (!binding) {
-      throw new Error(`'${name}' is not defined.`);
+      throw createReferenceError(`Binding '${name}' is not defined`);
     }
 
     return binding.value;
@@ -110,7 +111,7 @@ export class Interpreter {
     const callee = this.scope.lookup(expression.callee.name);
 
     if (callee.type !== 'native-function') {
-      throw new Error(`'${expression.callee.name}' is not callable.`);
+      throw createTypeError(`Binding '${expression.callee.name}' is not callable`);
     }
 
     const args = expression.arguments.map((arg) => this.evaluateExpression(arg));

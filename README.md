@@ -31,7 +31,8 @@ The execution pipeline is:
 
 1. lexer
 2. parser
-3. interpreter
+3. semantic analyzer
+4. interpreter
 
 Current file responsibilities:
 
@@ -39,6 +40,7 @@ Current file responsibilities:
 - `src/token.ts`: token definitions
 - `src/parser.ts`: builds the AST
 - `src/ast.ts`: AST node types
+- `src/semantic.ts`: semantic analysis before execution
 - `src/runtime.ts`: runtime values, `Scope`, and interpreter
 - `src/utils/char.ts`: reusable character helpers
 - `src/index.ts`: entrypoint that reads `main.fast`
@@ -62,6 +64,7 @@ yarn format
 - normal strings must use `"`
 - multiline strings must use `` ` ``
 - `print` is treated as an identifier in the lexer and as a builtin at runtime
+- symbol existence, callability, and `val` reassignment are checked semantically before execution
 
 ## Next Steps
 
