@@ -1,14 +1,17 @@
 export enum TokenType {
-  Var = 'VAR',
-  Val = 'VAL',
-  Identifier = 'IDENTIFIER',
-  Number = 'NUMBER',
-  String = 'STRING',
+  Comma = 'COMMA',
+  EOF = 'EOF',
   Equals = 'EQUALS',
+  Identifier = 'IDENTIFIER',
+  LeftBracket = 'LEFT_BRACKET',
   LeftParen = 'LEFT_PAREN',
+  Number = 'NUMBER',
+  RightBracket = 'RIGHT_BRACKET',
   RightParen = 'RIGHT_PAREN',
   Semicolon = 'SEMICOLON',
-  EOF = 'EOF',
+  String = 'STRING',
+  Val = 'VAL',
+  Var = 'VAR',
 }
 
 export type Token = {

@@ -1,4 +1,5 @@
 import type {
+  ArrayLiteral,
   AssignmentStatement,
   CallExpression,
   Expression,
@@ -14,6 +15,11 @@ import { createReferenceError, createTypeError } from './errors';
 type Binding = {
   mutable: boolean;
   value: RuntimeValue;
+};
+
+export type ArrayValue = {
+  elements: RuntimeValue[];
+  type: 'array';
 };
 
 export type NativeFunctionValue = {
@@ -32,7 +38,7 @@ export type NumberValue = {
   value: number;
 };
 
-export type RuntimeValue = NumberValue | StringValue | NullValue | NativeFunctionValue;
+export type RuntimeValue = ArrayValue | NativeFunctionValue | NullValue | NumberValue | StringValue;
 
 export type StringValue = {
   type: 'string';
@@ -107,6 +113,13 @@ export class Interpreter {
     return lastValue;
   }
 
+  private evaluateArrayLiteral(expression: ArrayLiteral): RuntimeValue {
+    return {
+      elements: expression.elements.map((element) => this.evaluateExpression(element)),
+      type: 'array',
+    };
+  }
+
   private evaluateCallExpression(expression: CallExpression): RuntimeValue {
     const callee = this.scope.lookup(expression.callee.name);
 
@@ -120,6 +133,8 @@ export class Interpreter {
 
   private evaluateExpression(expression: Expression): RuntimeValue {
     switch (expression.kind) {
+      case 'ArrayLiteral':
+        return this.evaluateArrayLiteral(expression);
       case 'CallExpression':
         return this.evaluateCallExpression(expression);
       case 'Identifier':
@@ -173,6 +188,8 @@ export class Interpreter {
 
   private runtimeValueToString(value: RuntimeValue): string {
     switch (value.type) {
+      case 'array':
+        return `[${value.elements.map((element) => this.runtimeValueToString(element)).join(', ')}]`;
       case 'native-function':
         return `<native function ${value.name}>`;
       case 'null':

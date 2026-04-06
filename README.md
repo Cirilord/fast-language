@@ -10,6 +10,7 @@ Right now the project is implemented in TypeScript and already supports:
 - number literals
 - string literals with `"`
 - multiline strings with `` ` ``
+- array literals with `[value, value]`
 - generic function-call parsing like `print(a);`
 - a builtin `print(...)` in the interpreter
 
@@ -18,11 +19,9 @@ Right now the project is implemented in TypeScript and already supports:
 `main.fast`
 
 ```fast
-var a = 30;
-val b = "Test";
+val items = ["first", "second", "third"];
 
-print(a);
-print(b);
+print(items);
 ```
 
 ## Project Flow
@@ -63,6 +62,7 @@ yarn format
 - only `var` can be reassigned
 - normal strings must use `"`
 - multiline strings must use `` ` ``
+- arrays use `[value, value]`
 - `print` is treated as an identifier in the lexer and as a builtin at runtime
 - symbol existence, callability, and `val` reassignment are checked semantically before execution
 
@@ -73,5 +73,6 @@ Possible next milestones:
 - arithmetic expressions
 - multiple function arguments
 - nested scopes
+- `for ... of` loops
 - user-defined functions
 - migration from TypeScript interpreter to C implementation

@@ -1,4 +1,5 @@
 import type {
+  ArrayLiteral,
   AssignmentStatement,
   CallExpression,
   Expression,
@@ -10,14 +11,32 @@ import type {
 } from './ast';
 import { createReferenceError, createSyntaxError, createTypeError } from './errors';
 
+type SemanticType = 'array' | 'function' | 'null' | 'number' | 'string' | 'unknown';
+
 type SemanticSymbol = {
   callable: boolean;
   mutable: boolean;
   name: string;
+  type: SemanticType;
 };
 
 class SemanticScope {
   private readonly symbols = new Map<string, SemanticSymbol>();
+
+  public assign(name: string, type: SemanticType, location?: Identifier['location']): SemanticSymbol {
+    const symbol = this.symbols.get(name);
+
+    if (symbol === undefined) {
+      throw createReferenceError(`Binding '${name}' is not defined`, location);
+    }
+
+    if (!symbol.mutable) {
+      throw createTypeError(`Cannot reassign immutable binding '${name}'`, location);
+    }
+
+    symbol.type = type;
+    return symbol;
+  }
 
   public define(symbol: SemanticSymbol, location?: Identifier['location']): void {
     if (this.symbols.has(symbol.name)) {
@@ -46,6 +65,7 @@ export class SemanticAnalyzer {
       callable: true,
       mutable: false,
       name: 'print',
+      type: 'function',
     });
   }
 
@@ -55,20 +75,20 @@ export class SemanticAnalyzer {
     }
   }
 
-  private analyzeAssignmentStatement(statement: AssignmentStatement): void {
-    const symbol = this.scope.lookup(statement.identifier.name, statement.identifier.location);
-
-    if (!symbol.mutable) {
-      throw createTypeError(
-        `Cannot reassign immutable binding '${statement.identifier.name}'`,
-        statement.identifier.location
-      );
+  private analyzeArrayLiteral(expression: ArrayLiteral): SemanticType {
+    for (const element of expression.elements) {
+      this.analyzeExpression(element);
     }
 
-    this.analyzeExpression(statement.value);
+    return 'array';
   }
 
-  private analyzeCallExpression(expression: CallExpression): void {
+  private analyzeAssignmentStatement(statement: AssignmentStatement): void {
+    const type = this.analyzeExpression(statement.value);
+    this.scope.assign(statement.identifier.name, type, statement.identifier.location);
+  }
+
+  private analyzeCallExpression(expression: CallExpression): SemanticType {
     const callee = this.scope.lookup(expression.callee.name, expression.callee.location);
 
     if (!callee.callable) {
@@ -78,22 +98,22 @@ export class SemanticAnalyzer {
     for (const arg of expression.arguments) {
       this.analyzeExpression(arg);
     }
+
+    return 'unknown';
   }
 
-  private analyzeExpression(expression: Expression): void {
+  private analyzeExpression(expression: Expression): SemanticType {
     switch (expression.kind) {
+      case 'ArrayLiteral':
+        return this.analyzeArrayLiteral(expression);
       case 'CallExpression':
-        this.analyzeCallExpression(expression);
-        return;
+        return this.analyzeCallExpression(expression);
       case 'Identifier':
-        this.analyzeIdentifier(expression);
-        return;
+        return this.analyzeIdentifier(expression);
       case 'NumberLiteral':
-        this.analyzeNumberLiteral();
-        return;
+        return this.analyzeNumberLiteral();
       case 'StringLiteral':
-        this.analyzeStringLiteral();
-        return;
+        return this.analyzeStringLiteral();
     }
   }
 
@@ -101,11 +121,13 @@ export class SemanticAnalyzer {
     this.analyzeExpression(statement.expression);
   }
 
-  private analyzeIdentifier(expression: Identifier): void {
-    this.scope.lookup(expression.name, expression.location);
+  private analyzeIdentifier(expression: Identifier): SemanticType {
+    return this.scope.lookup(expression.name, expression.location).type;
   }
 
-  private analyzeNumberLiteral(): void {}
+  private analyzeNumberLiteral(): SemanticType {
+    return 'number';
+  }
 
   private analyzeStatement(statement: Statement): void {
     switch (statement.kind) {
@@ -121,15 +143,18 @@ export class SemanticAnalyzer {
     }
   }
 
-  private analyzeStringLiteral(): void {}
+  private analyzeStringLiteral(): SemanticType {
+    return 'string';
+  }
 
   private analyzeVariableDeclaration(statement: VariableDeclaration): void {
-    this.analyzeExpression(statement.initializer);
+    const type = this.analyzeExpression(statement.initializer);
     this.scope.define(
       {
         callable: false,
         mutable: statement.declarationType === 'var',
         name: statement.identifier.name,
+        type,
       },
       statement.identifier.location
     );

@@ -19,6 +19,7 @@ This file tracks working conventions for the `fast` language project so future c
 - `print` is not a lexer keyword; it is tokenized as `IDENTIFIER`.
 - Normal strings use `"`.
 - Multiline strings use `` ` ``.
+- Arrays use `[value, value]`.
 
 ## Code Conventions
 

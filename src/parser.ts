@@ -1,4 +1,5 @@
 import type {
+  ArrayLiteral,
   AssignmentStatement,
   CallExpression,
   Expression,
@@ -93,6 +94,23 @@ export class Parser {
     return false;
   }
 
+  private parseArrayLiteral(): ArrayLiteral {
+    const elements: Expression[] = [];
+
+    if (!this.check(TokenType.RightBracket)) {
+      do {
+        elements.push(this.parseExpression());
+      } while (this.match(TokenType.Comma) && !this.check(TokenType.RightBracket));
+    }
+
+    this.consume(TokenType.RightBracket, "Expected ']' after array elements.");
+
+    return {
+      elements,
+      kind: 'ArrayLiteral',
+    };
+  }
+
   private parseAssignmentStatement(): AssignmentStatement {
     const identifier = this.consume(TokenType.Identifier, 'Expected identifier before assignment.');
 
@@ -138,6 +156,10 @@ export class Parser {
   }
 
   private parsePrimary(): Expression {
+    if (this.match(TokenType.LeftBracket)) {
+      return this.parseArrayLiteral();
+    }
+
     if (this.match(TokenType.Identifier)) {
       return this.createIdentifier(this.previous());
     }

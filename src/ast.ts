@@ -3,7 +3,7 @@ export type Program = {
   kind: 'Program';
 };
 
-export type Statement = VariableDeclaration | AssignmentStatement | ExpressionStatement;
+export type Statement = AssignmentStatement | ExpressionStatement | VariableDeclaration;
 
 export type SourceLocation = {
   column: number;
@@ -28,7 +28,12 @@ export type ExpressionStatement = {
   kind: 'ExpressionStatement';
 };
 
-export type Expression = Identifier | NumberLiteral | StringLiteral | CallExpression;
+export type Expression = ArrayLiteral | CallExpression | Identifier | NumberLiteral | StringLiteral;
+
+export type ArrayLiteral = {
+  elements: Expression[];
+  kind: 'ArrayLiteral';
+};
 
 export type Identifier = {
   kind: 'Identifier';

@@ -1,5 +1,8 @@
 var a = 30;
 val b = "Test";
+val items = ["first", "second", "third"];
+
+print(items);
 
 a = 50;
 

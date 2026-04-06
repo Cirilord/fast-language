@@ -15,6 +15,10 @@ export class Char {
     return char === '\n';
   }
 
+  public static isComma(char: string): boolean {
+    return char === ',';
+  }
+
   public static isDigit(char: string): boolean {
     return char >= '0' && char <= '9';
   }
@@ -27,8 +31,16 @@ export class Char {
     return char === '=';
   }
 
+  public static isLeftBracket(char: string): boolean {
+    return char === '[';
+  }
+
   public static isLeftParen(char: string): boolean {
     return char === '(';
+  }
+
+  public static isRightBracket(char: string): boolean {
+    return char === ']';
   }
 
   public static isRightParen(char: string): boolean {

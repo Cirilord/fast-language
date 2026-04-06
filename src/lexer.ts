@@ -2,8 +2,8 @@ import { type Token, TokenType } from './token';
 import { Char } from './utils/char';
 
 const KEYWORDS: Record<string, TokenType> = {
-  var: TokenType.Var,
   val: TokenType.Val,
+  var: TokenType.Var,
 };
 
 export class Lexer {
@@ -32,6 +32,21 @@ export class Lexer {
 
       if (Char.isEquals(char)) {
         tokens.push(this.makeToken(TokenType.Equals, char, startColumn));
+        continue;
+      }
+
+      if (Char.isComma(char)) {
+        tokens.push(this.makeToken(TokenType.Comma, char, startColumn));
+        continue;
+      }
+
+      if (Char.isLeftBracket(char)) {
+        tokens.push(this.makeToken(TokenType.LeftBracket, char, startColumn));
+        continue;
+      }
+
+      if (Char.isRightBracket(char)) {
+        tokens.push(this.makeToken(TokenType.RightBracket, char, startColumn));
         continue;
       }
 
