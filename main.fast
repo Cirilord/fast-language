@@ -6,6 +6,8 @@ val result = (10i + 5i) * 2i;
 val directNegative = -10i;
 val negative = -(5i + 2i);
 val rest = 10i % 3i;
+val isBigger = 10i > 5i;
+val isEqual = 10i == 10i;
 var x = 10i;
 
 x += 5i;
@@ -27,4 +29,6 @@ print(result);
 print(directNegative);
 print(negative);
 print(rest);
+print(isBigger);
+print(isEqual);
 print(x);

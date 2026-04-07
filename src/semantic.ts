@@ -18,7 +18,7 @@ import type {
 } from './ast';
 import { createReferenceError, createSyntaxError, createTypeError } from './errors';
 
-type SemanticType = 'array' | 'function' | 'null' | NumberLiteralType | 'string' | 'unknown';
+type SemanticType = 'array' | 'boolean' | 'function' | 'null' | NumberLiteralType | 'string' | 'unknown';
 
 type SemanticSymbol = {
   callable: boolean;
@@ -29,6 +29,14 @@ type SemanticSymbol = {
 
 function isNumericType(type: SemanticType): type is NumberLiteralType {
   return type === 'double' || type === 'float' || type === 'int';
+}
+
+function isEqualityOperator(operator: BinaryOperator): boolean {
+  return operator === '==' || operator === '!=';
+}
+
+function isRelationalOperator(operator: BinaryOperator): boolean {
+  return operator === '>' || operator === '>=' || operator === '<' || operator === '<=';
 }
 
 function promoteNumericType(
@@ -165,6 +173,26 @@ export class SemanticAnalyzer {
   private analyzeBinaryExpression(expression: BinaryExpression): SemanticType {
     const leftType = this.analyzeExpression(expression.left);
     const rightType = this.analyzeExpression(expression.right);
+
+    if (isEqualityOperator(expression.operator)) {
+      if (isNumericType(leftType) && isNumericType(rightType)) {
+        return 'boolean';
+      }
+
+      if (leftType !== rightType && leftType !== 'unknown' && rightType !== 'unknown') {
+        throw createTypeError(`Operator '${expression.operator}' expects operands with compatible types`);
+      }
+
+      return 'boolean';
+    }
+
+    if (isRelationalOperator(expression.operator)) {
+      if (!isNumericType(leftType) || !isNumericType(rightType)) {
+        throw createTypeError(`Operator '${expression.operator}' expects number operands`);
+      }
+
+      return 'boolean';
+    }
 
     if (!isNumericType(leftType) || !isNumericType(rightType)) {
       throw createTypeError(`Operator '${expression.operator}' expects number operands`);

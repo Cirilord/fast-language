@@ -210,8 +210,44 @@ export class Parser {
     } satisfies CallExpression;
   }
 
+  private parseComparison(): Expression {
+    let expression = this.parseTerm();
+
+    while (this.match(TokenType.Greater, TokenType.GreaterEquals, TokenType.Less, TokenType.LessEquals)) {
+      const operator = this.previous().lexeme as BinaryOperator;
+      const right = this.parseTerm();
+
+      expression = {
+        kind: 'BinaryExpression',
+        left: expression,
+        operator,
+        right,
+      } satisfies BinaryExpression;
+    }
+
+    return expression;
+  }
+
+  private parseEquality(): Expression {
+    let expression = this.parseComparison();
+
+    while (this.match(TokenType.EqualEqual, TokenType.BangEqual)) {
+      const operator = this.previous().lexeme as BinaryOperator;
+      const right = this.parseComparison();
+
+      expression = {
+        kind: 'BinaryExpression',
+        left: expression,
+        operator,
+        right,
+      } satisfies BinaryExpression;
+    }
+
+    return expression;
+  }
+
   private parseExpression(): Expression {
-    return this.parseTerm();
+    return this.parseEquality();
   }
 
   private parseFactor(): Expression {

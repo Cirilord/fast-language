@@ -8,6 +8,7 @@ Right now the project is implemented in TypeScript and already supports:
 - constant declarations with `val`
 - reassignment for `var`
 - arithmetic expressions with `+`, `-`, `*`, `/`, `%`, unary `-`, and grouped expressions with `(...)`
+- comparison expressions with `>`, `>=`, `<`, `<=`, `==`, and `!=`
 - compound assignment operators with `+=`, `-=`, `*=`, `/=`, and `%=`
 - typed number literals with required suffixes: `10i`, `20.0f`, `30.0d`
 - string literals with `"`
@@ -30,6 +31,8 @@ val result = (10i + 5i) * 2i;
 val directNegative = -10i;
 val negative = -(5i + 2i);
 val rest = 10i % 3i;
+val isBigger = 10i > 5i;
+val isEqual = 10i == 10i;
 var x = 10i;
 
 x += 5i;
@@ -47,6 +50,8 @@ print(result);
 print(directNegative);
 print(negative);
 print(rest);
+print(isBigger);
+print(isEqual);
 print(x);
 ```
 
@@ -101,6 +106,8 @@ Then open a `.fast` file in the extension development window.
 - only `var` can be reassigned
 - arithmetic operators currently expect number operands
 - compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands
+- comparison operators `>`, `>=`, `<`, and `<=` expect number operands and return booleans
+- equality operators `==` and `!=` return booleans
 - unary `-` can be used with numbers, including grouped expressions like `-(5i + 2i)`
 - parentheses can be used to group arithmetic expressions
 - number literals must include a type suffix: `i` for integer, `f` for float, or `d` for double

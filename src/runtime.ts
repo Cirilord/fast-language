@@ -23,6 +23,11 @@ type Binding = {
   value: RuntimeValue;
 };
 
+export type BooleanValue = {
+  type: 'boolean';
+  value: boolean;
+};
+
 export type ArrayValue = {
   elements: RuntimeValue[];
   type: 'array';
@@ -45,7 +50,7 @@ export type NumberValue = {
   value: number;
 };
 
-export type RuntimeValue = ArrayValue | NativeFunctionValue | NullValue | NumberValue | StringValue;
+export type RuntimeValue = ArrayValue | BooleanValue | NativeFunctionValue | NullValue | NumberValue | StringValue;
 
 export type StringValue = {
   type: 'string';
@@ -70,6 +75,31 @@ function promoteNumberType(
   }
 
   return 'int';
+}
+
+function areRuntimeValuesEqual(left: RuntimeValue, right: RuntimeValue): boolean {
+  if (left.type !== right.type) {
+    return false;
+  }
+
+  switch (left.type) {
+    case 'array':
+      return left === right;
+    case 'boolean':
+      return right.type === 'boolean' && left.value === right.value;
+    case 'native-function':
+      return left === right;
+    case 'null':
+      return true;
+    case 'number':
+      return right.type === 'number' && left.value === right.value;
+    case 'string':
+      return right.type === 'string' && left.value === right.value;
+  }
+}
+
+function isEqualityOperator(operator: BinaryOperator): boolean {
+  return operator === '==' || operator === '!=';
 }
 
 function toBinaryOperator(operator: AssignmentOperator): BinaryOperator {
@@ -214,11 +244,40 @@ export class Interpreter {
     const left = this.evaluateExpression(expression.left);
     const right = this.evaluateExpression(expression.right);
 
+    if (isEqualityOperator(expression.operator)) {
+      const value = areRuntimeValuesEqual(left, right);
+
+      return {
+        type: 'boolean',
+        value: expression.operator === '!=' ? !value : value,
+      };
+    }
+
     if (left.type !== 'number' || right.type !== 'number') {
       throw createTypeError(`Operator '${expression.operator}' expects number operands`);
     }
 
     switch (expression.operator) {
+      case '>':
+        return {
+          type: 'boolean',
+          value: left.value > right.value,
+        };
+      case '>=':
+        return {
+          type: 'boolean',
+          value: left.value >= right.value,
+        };
+      case '<':
+        return {
+          type: 'boolean',
+          value: left.value < right.value,
+        };
+      case '<=':
+        return {
+          type: 'boolean',
+          value: left.value <= right.value,
+        };
       case '%':
         return {
           numberType: promoteNumberType(expression.operator, left.numberType, right.numberType),
@@ -249,6 +308,9 @@ export class Interpreter {
           type: 'number',
           value: left.value / right.value,
         };
+      case '!=':
+      case '==':
+        throw createTypeError(`Operator '${expression.operator}' should be handled as equality`);
     }
   }
 
@@ -372,6 +434,8 @@ export class Interpreter {
     switch (value.type) {
       case 'array':
         return `[${value.elements.map((element) => this.runtimeValueToString(element)).join(', ')}]`;
+      case 'boolean':
+        return String(value.value);
       case 'native-function':
         return `<native function ${value.name}>`;
       case 'null':

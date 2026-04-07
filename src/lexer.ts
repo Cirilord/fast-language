@@ -33,8 +33,49 @@ export class Lexer {
         continue;
       }
 
+      if (Char.isBang(char)) {
+        if (Char.isEquals(this.peek())) {
+          this.advance();
+          tokens.push(this.makeToken(TokenType.BangEqual, '!=', startColumn));
+          continue;
+        }
+
+        throw createSyntaxError("Unexpected character '!'. Did you mean '!='?", {
+          column: startColumn,
+          line: this.line,
+        });
+      }
+
       if (Char.isEquals(char)) {
+        if (Char.isEquals(this.peek())) {
+          this.advance();
+          tokens.push(this.makeToken(TokenType.EqualEqual, '==', startColumn));
+          continue;
+        }
+
         tokens.push(this.makeToken(TokenType.Equals, char, startColumn));
+        continue;
+      }
+
+      if (Char.isGreater(char)) {
+        if (Char.isEquals(this.peek())) {
+          this.advance();
+          tokens.push(this.makeToken(TokenType.GreaterEquals, '>=', startColumn));
+          continue;
+        }
+
+        tokens.push(this.makeToken(TokenType.Greater, char, startColumn));
+        continue;
+      }
+
+      if (Char.isLess(char)) {
+        if (Char.isEquals(this.peek())) {
+          this.advance();
+          tokens.push(this.makeToken(TokenType.LessEquals, '<=', startColumn));
+          continue;
+        }
+
+        tokens.push(this.makeToken(TokenType.Less, char, startColumn));
         continue;
       }
 

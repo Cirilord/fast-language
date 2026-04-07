@@ -11,6 +11,10 @@ export class Char {
     return char === '`';
   }
 
+  public static isBang(char: string): boolean {
+    return char === '!';
+  }
+
   public static isBreakline(char: string): boolean {
     return char === '\n';
   }
@@ -35,6 +39,10 @@ export class Char {
     return char === '=';
   }
 
+  public static isGreater(char: string): boolean {
+    return char === '>';
+  }
+
   public static isLeftBrace(char: string): boolean {
     return char === '{';
   }
@@ -45,6 +53,10 @@ export class Char {
 
   public static isLeftParen(char: string): boolean {
     return char === '(';
+  }
+
+  public static isLess(char: string): boolean {
+    return char === '<';
   }
 
   public static isMinus(char: string): boolean {
