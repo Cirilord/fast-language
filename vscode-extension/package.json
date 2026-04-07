@@ -1,0 +1,35 @@
+{
+  "name": "fast-language-vscode",
+  "displayName": "Fast Language",
+  "description": "Syntax highlighting and editor support for the fast language.",
+  "version": "0.0.1",
+  "publisher": "fast-language",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "fast",
+        "aliases": [
+          "Fast",
+          "fast"
+        ],
+        "extensions": [
+          ".fast"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "fast",
+        "scopeName": "source.fast",
+        "path": "./syntaxes/fast.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -8,6 +8,7 @@ This file tracks working conventions for the `fast` language project so future c
 
 - The project is currently a TypeScript implementation of the `fast` language.
 - The language already has a lexer, parser, semantic analyzer, and interpreter.
+- Local VS Code syntax highlighting lives in `vscode-extension`.
 - Runtime name resolution is currently handled through `Scope` in `src/runtime.ts`.
 - The active sample program lives in `main.fast`.
 
@@ -37,6 +38,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Prefer explicit typing and follow the ESLint rules configured in `eslint.config.mjs`.
 - Keep the TypeScript configuration aligned with `@tsconfig/strictest` in `tsconfig.json`.
 - Character classification helpers should live in `src/utils/char.ts`.
+- VS Code grammar updates should live in `vscode-extension/syntaxes/fast.tmLanguage.json`.
 - Semantic checks should stay centralized in `src/semantic.ts`.
 - Runtime scope behavior should stay centralized in `src/runtime.ts`.
 

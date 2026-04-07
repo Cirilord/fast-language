@@ -1,0 +1,124 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Fast",
+  "scopeName": "source.fast",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.function.fast",
+          "match": "\\bprint\\b"
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.fast",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "storage.modifier.fast",
+          "match": "\\b(?:val|var)\\b"
+        },
+        {
+          "name": "keyword.control.fast",
+          "match": "\\b(?:for|of)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.integer.fast",
+          "match": "\\b\\d+i\\b"
+        },
+        {
+          "name": "constant.numeric.float.fast",
+          "match": "\\b\\d+(?:\\.\\d+)?f\\b"
+        },
+        {
+          "name": "constant.numeric.double.fast",
+          "match": "\\b\\d+(?:\\.\\d+)?d\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.assignment.fast",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.arithmetic.fast",
+          "match": "[+\\-*/]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.statement.fast",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.comma.fast",
+          "match": ","
+        },
+        {
+          "name": "punctuation.section.braces.fast",
+          "match": "[{}]"
+        },
+        {
+          "name": "punctuation.section.brackets.fast",
+          "match": "[\\[\\]]"
+        },
+        {
+          "name": "punctuation.section.parens.fast",
+          "match": "[()]"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.fast",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.backtick.fast",
+          "begin": "`",
+          "end": "`"
+        }
+      ]
+    }
+  }
+}

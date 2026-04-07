@@ -16,6 +16,7 @@ Right now the project is implemented in TypeScript and already supports:
 - `for ... of` loops with optional index binding
 - generic function-call parsing like `print(a);`
 - a builtin `print(...)` in the interpreter
+- local VS Code syntax highlighting support in `vscode-extension`
 
 ## Example
 
@@ -54,6 +55,7 @@ Current file responsibilities:
 - `src/utils/char.ts`: reusable character helpers
 - `src/index.ts`: entrypoint that reads `main.fast`
 - `tsconfig.json`: project TypeScript config extending `@tsconfig/strictest`
+- `vscode-extension`: local VS Code extension for `.fast` syntax highlighting
 
 ## Scripts
 
@@ -64,6 +66,18 @@ yarn start
 yarn lint
 yarn format
 ```
+
+## VS Code Syntax Highlighting
+
+This repo includes a local VS Code extension in `vscode-extension`.
+
+To test it locally:
+
+```bash
+code --extensionDevelopmentPath=./vscode-extension
+```
+
+Then open a `.fast` file in the extension development window.
 
 ## Current Language Rules
 
