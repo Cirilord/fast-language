@@ -201,7 +201,7 @@ export class Parser {
   private parseFactor(): Expression {
     let expression = this.parseUnaryExpression();
 
-    while (this.match(TokenType.Star, TokenType.Slash)) {
+    while (this.match(TokenType.Star, TokenType.Slash, TokenType.Percent)) {
       const operator = this.previous().lexeme as BinaryOperator;
       const right = this.parseUnaryExpression();
 

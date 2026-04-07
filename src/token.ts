@@ -10,6 +10,7 @@ export enum TokenType {
   Minus = 'MINUS',
   Number = 'NUMBER',
   Of = 'OF',
+  Percent = 'PERCENT',
   Plus = 'PLUS',
   RightBrace = 'RIGHT_BRACE',
   RightBracket = 'RIGHT_BRACKET',

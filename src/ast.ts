@@ -36,7 +36,7 @@ export type ExpressionStatement = {
   kind: 'ExpressionStatement';
 };
 
-export type BinaryOperator = '+' | '-' | '*' | '/';
+export type BinaryOperator = '%' | '*' | '+' | '-' | '/';
 
 export type UnaryOperator = '-';
 

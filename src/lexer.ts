@@ -48,6 +48,11 @@ export class Lexer {
         continue;
       }
 
+      if (Char.isPercent(char)) {
+        tokens.push(this.makeToken(TokenType.Percent, char, startColumn));
+        continue;
+      }
+
       if (Char.isStar(char)) {
         tokens.push(this.makeToken(TokenType.Star, char, startColumn));
         continue;

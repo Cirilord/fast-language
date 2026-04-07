@@ -161,6 +161,12 @@ export class Interpreter {
     }
 
     switch (expression.operator) {
+      case '%':
+        return {
+          numberType: promoteNumberType(expression.operator, left.numberType, right.numberType),
+          type: 'number',
+          value: left.value % right.value,
+        };
       case '+':
         return {
           numberType: promoteNumberType(expression.operator, left.numberType, right.numberType),

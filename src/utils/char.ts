@@ -55,6 +55,10 @@ export class Char {
     return char === 'i' || char === 'f' || char === 'd';
   }
 
+  public static isPercent(char: string): boolean {
+    return char === '%';
+  }
+
   public static isPlus(char: string): boolean {
     return char === '+';
   }

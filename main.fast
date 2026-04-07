@@ -5,6 +5,7 @@ val items = ["first", "second", "third"];
 val result = (10i + 5i) * 2i;
 val directNegative = -10i;
 val negative = -(5i + 2i);
+val rest = 10i % 3i;
 
 // for (var item, index of items) {
 //   print(index);
@@ -18,3 +19,4 @@ print(b);
 print(result);
 print(directNegative);
 print(negative);
+print(rest);

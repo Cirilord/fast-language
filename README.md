@@ -7,7 +7,7 @@ Right now the project is implemented in TypeScript and already supports:
 - variable declarations with `var`
 - constant declarations with `val`
 - reassignment for `var`
-- arithmetic expressions with `+`, `-`, `*`, `/`, unary `-`, and grouped expressions with `(...)`
+- arithmetic expressions with `+`, `-`, `*`, `/`, `%`, unary `-`, and grouped expressions with `(...)`
 - typed number literals with required suffixes: `10i`, `20.0f`, `30.0d`
 - string literals with `"`
 - multiline strings with `` ` ``
@@ -28,6 +28,7 @@ val items = ["first", "second", "third"];
 val result = (10i + 5i) * 2i;
 val directNegative = -10i;
 val negative = -(5i + 2i);
+val rest = 10i % 3i;
 
 for (var item, index of items) {
   print(index);
@@ -37,6 +38,7 @@ for (var item, index of items) {
 print(result);
 print(directNegative);
 print(negative);
+print(rest);
 ```
 
 ## Project Flow
