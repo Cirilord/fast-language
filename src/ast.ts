@@ -38,7 +38,16 @@ export type ExpressionStatement = {
 
 export type BinaryOperator = '+' | '-' | '*' | '/';
 
-export type Expression = ArrayLiteral | BinaryExpression | CallExpression | Identifier | NumberLiteral | StringLiteral;
+export type UnaryOperator = '-';
+
+export type Expression =
+  | ArrayLiteral
+  | BinaryExpression
+  | CallExpression
+  | Identifier
+  | NumberLiteral
+  | StringLiteral
+  | UnaryExpression;
 
 export type ArrayLiteral = {
   elements: Expression[];
@@ -69,6 +78,12 @@ export type NumberLiteralType = 'double' | 'float' | 'int';
 export type StringLiteral = {
   kind: 'StringLiteral';
   value: string;
+};
+
+export type UnaryExpression = {
+  argument: Expression;
+  kind: 'UnaryExpression';
+  operator: UnaryOperator;
 };
 
 export type CallExpression = {

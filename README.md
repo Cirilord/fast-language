@@ -7,7 +7,7 @@ Right now the project is implemented in TypeScript and already supports:
 - variable declarations with `var`
 - constant declarations with `val`
 - reassignment for `var`
-- arithmetic expressions with `+`, `-`, `*`, `/`, and grouped expressions with `(...)`
+- arithmetic expressions with `+`, `-`, `*`, `/`, unary `-`, and grouped expressions with `(...)`
 - typed number literals with required suffixes: `10i`, `20.0f`, `30.0d`
 - string literals with `"`
 - multiline strings with `` ` ``
@@ -26,6 +26,8 @@ Right now the project is implemented in TypeScript and already supports:
 // Number literals must include a type suffix.
 val items = ["first", "second", "third"];
 val result = (10i + 5i) * 2i;
+val directNegative = -10i;
+val negative = -(5i + 2i);
 
 for (var item, index of items) {
   print(index);
@@ -33,6 +35,8 @@ for (var item, index of items) {
 }
 
 print(result);
+print(directNegative);
+print(negative);
 ```
 
 ## Project Flow
@@ -85,6 +89,7 @@ Then open a `.fast` file in the extension development window.
 - `val` creates immutable bindings
 - only `var` can be reassigned
 - arithmetic operators currently expect number operands
+- unary `-` can be used with numbers, including grouped expressions like `-(5i + 2i)`
 - parentheses can be used to group arithmetic expressions
 - number literals must include a type suffix: `i` for integer, `f` for float, or `d` for double
 - integer literals cannot include a decimal point; use `20.0f` or `20.0d` for decimal values

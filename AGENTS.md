@@ -19,6 +19,7 @@ This file tracks working conventions for the `fast` language project so future c
 - only `var` can be reassigned.
 - Arithmetic operators currently expect number operands.
 - Parentheses can group arithmetic expressions.
+- Unary `-` can be used with numbers and grouped numeric expressions.
 - Number literals must include a type suffix: `i` for integer, `f` for float, or `d` for double.
 - Integer literals cannot include a decimal point; use `f` or `d` for decimal values.
 - Arithmetic promotes mixed numeric types, and division between integers produces a `double`.

@@ -3,6 +3,8 @@ var a = 30i;
 val b = "Test";
 val items = ["first", "second", "third"];
 val result = (10i + 5i) * 2i;
+val directNegative = -10i;
+val negative = -(5i + 2i);
 
 // for (var item, index of items) {
 //   print(index);
@@ -14,3 +16,5 @@ a = 50i;
 print(a);
 print(b);
 print(result);
+print(directNegative);
+print(negative);

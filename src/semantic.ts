@@ -12,6 +12,7 @@ import type {
   NumberLiteralType,
   Program,
   Statement,
+  UnaryExpression,
   VariableDeclaration,
 } from './ast';
 import { createReferenceError, createSyntaxError, createTypeError } from './errors';
@@ -162,6 +163,8 @@ export class SemanticAnalyzer {
         return this.analyzeNumberLiteral(expression);
       case 'StringLiteral':
         return this.analyzeStringLiteral();
+      case 'UnaryExpression':
+        return this.analyzeUnaryExpression(expression);
     }
   }
 
@@ -232,6 +235,16 @@ export class SemanticAnalyzer {
 
   private analyzeStringLiteral(): SemanticType {
     return 'string';
+  }
+
+  private analyzeUnaryExpression(expression: UnaryExpression): SemanticType {
+    const argumentType = this.analyzeExpression(expression.argument);
+
+    if (!isNumericType(argumentType)) {
+      throw createTypeError(`Operator '${expression.operator}' expects a number operand`);
+    }
+
+    return argumentType;
   }
 
   private analyzeVariableDeclaration(statement: VariableDeclaration): void {

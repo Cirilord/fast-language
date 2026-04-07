@@ -13,6 +13,8 @@ import type {
   Program,
   Statement,
   StringLiteral,
+  UnaryExpression,
+  UnaryOperator,
   VariableDeclaration,
 } from './ast';
 import { createSyntaxError } from './errors';
@@ -197,11 +199,11 @@ export class Parser {
   }
 
   private parseFactor(): Expression {
-    let expression = this.parseCallExpression();
+    let expression = this.parseUnaryExpression();
 
     while (this.match(TokenType.Star, TokenType.Slash)) {
       const operator = this.previous().lexeme as BinaryOperator;
-      const right = this.parseCallExpression();
+      const right = this.parseUnaryExpression();
 
       expression = {
         kind: 'BinaryExpression',
@@ -311,6 +313,20 @@ export class Parser {
     }
 
     return expression;
+  }
+
+  private parseUnaryExpression(): Expression {
+    if (this.match(TokenType.Minus)) {
+      const operator = this.previous().lexeme as UnaryOperator;
+
+      return {
+        argument: this.parseUnaryExpression(),
+        kind: 'UnaryExpression',
+        operator,
+      } satisfies UnaryExpression;
+    }
+
+    return this.parseCallExpression();
   }
 
   private parseVariableDeclaration(declarationType: 'var' | 'val'): VariableDeclaration {

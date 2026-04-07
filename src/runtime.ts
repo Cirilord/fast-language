@@ -12,6 +12,7 @@ import type {
   Program,
   Statement,
   StringLiteral,
+  UnaryExpression,
   VariableDeclaration,
 } from './ast';
 import { createReferenceError, createTypeError } from './errors';
@@ -212,6 +213,8 @@ export class Interpreter {
         return this.evaluateNumberLiteral(expression);
       case 'StringLiteral':
         return this.evaluateStringLiteral(expression);
+      case 'UnaryExpression':
+        return this.evaluateUnaryExpression(expression);
     }
   }
 
@@ -231,6 +234,20 @@ export class Interpreter {
     return {
       type: 'string',
       value: expression.value,
+    };
+  }
+
+  private evaluateUnaryExpression(expression: UnaryExpression): RuntimeValue {
+    const argument = this.evaluateExpression(expression.argument);
+
+    if (argument.type !== 'number') {
+      throw createTypeError(`Operator '${expression.operator}' expects a number operand`);
+    }
+
+    return {
+      numberType: argument.numberType,
+      type: 'number',
+      value: -argument.value,
     };
   }
 
