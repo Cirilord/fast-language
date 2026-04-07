@@ -8,7 +8,7 @@ Right now the project is implemented in TypeScript and already supports:
 - constant declarations with `val`
 - reassignment for `var`
 - arithmetic expressions with `+`, `-`, `*`, `/`, and grouped expressions with `(...)`
-- number literals
+- typed number literals with required suffixes: `10i`, `20.0f`, `30.0d`
 - string literals with `"`
 - multiline strings with `` ` ``
 - array literals with `[value, value]`
@@ -22,7 +22,7 @@ Right now the project is implemented in TypeScript and already supports:
 
 ```fast
 val items = ["first", "second", "third"];
-val result = (10 + 5) * 2;
+val result = (10i + 5i) * 2i;
 
 for (var item, index of items) {
   print(index);
@@ -70,6 +70,9 @@ yarn format
 - only `var` can be reassigned
 - arithmetic operators currently expect number operands
 - parentheses can be used to group arithmetic expressions
+- number literals must include a type suffix: `i` for integer, `f` for float, or `d` for double
+- integer literals cannot include a decimal point; use `20.0f` or `20.0d` for decimal values
+- arithmetic promotes mixed numeric types, and division between integers produces a `double`
 - normal strings must use `"`
 - multiline strings must use `` ` ``
 - arrays use `[value, value]`

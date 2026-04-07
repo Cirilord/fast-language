@@ -2,11 +2,13 @@ import type {
   ArrayLiteral,
   AssignmentStatement,
   BinaryExpression,
+  BinaryOperator,
   CallExpression,
   Expression,
   ForStatement,
   Identifier,
   NumberLiteral,
+  NumberLiteralType,
   Program,
   Statement,
   StringLiteral,
@@ -36,6 +38,7 @@ export type NullValue = {
 };
 
 export type NumberValue = {
+  numberType: NumberLiteralType;
   type: 'number';
   value: number;
 };
@@ -46,6 +49,26 @@ export type StringValue = {
   type: 'string';
   value: string;
 };
+
+function promoteNumberType(
+  operator: BinaryOperator,
+  leftType: NumberLiteralType,
+  rightType: NumberLiteralType
+): NumberLiteralType {
+  if (leftType === 'double' || rightType === 'double') {
+    return 'double';
+  }
+
+  if (leftType === 'float' || rightType === 'float') {
+    return 'float';
+  }
+
+  if (operator === '/') {
+    return 'double';
+  }
+
+  return 'int';
+}
 
 class Scope {
   private readonly bindings = new Map<string, Binding>();
@@ -138,13 +161,29 @@ export class Interpreter {
 
     switch (expression.operator) {
       case '+':
-        return { type: 'number', value: left.value + right.value };
+        return {
+          numberType: promoteNumberType(expression.operator, left.numberType, right.numberType),
+          type: 'number',
+          value: left.value + right.value,
+        };
       case '-':
-        return { type: 'number', value: left.value - right.value };
+        return {
+          numberType: promoteNumberType(expression.operator, left.numberType, right.numberType),
+          type: 'number',
+          value: left.value - right.value,
+        };
       case '*':
-        return { type: 'number', value: left.value * right.value };
+        return {
+          numberType: promoteNumberType(expression.operator, left.numberType, right.numberType),
+          type: 'number',
+          value: left.value * right.value,
+        };
       case '/':
-        return { type: 'number', value: left.value / right.value };
+        return {
+          numberType: promoteNumberType(expression.operator, left.numberType, right.numberType),
+          type: 'number',
+          value: left.value / right.value,
+        };
     }
   }
 
@@ -182,6 +221,7 @@ export class Interpreter {
 
   private evaluateNumberLiteral(expression: NumberLiteral): RuntimeValue {
     return {
+      numberType: expression.numberType,
       type: 'number',
       value: expression.value,
     };
@@ -212,7 +252,7 @@ export class Interpreter {
         this.scope.define(statement.element.name, element, true);
 
         if (statement.index !== undefined) {
-          this.scope.define(statement.index.name, { type: 'number', value: index }, false);
+          this.scope.define(statement.index.name, { numberType: 'int', type: 'number', value: index }, false);
         }
 
         let bodyValue: RuntimeValue = { type: 'null', value: null };

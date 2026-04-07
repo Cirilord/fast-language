@@ -1,14 +1,14 @@
-var a = 30;
+var a = 30i;
 val b = "Test";
 val items = ["first", "second", "third"];
-val result = (10 + 5) * 2;
+val result = (10i + 5i) * 2i;
 
 for (var item, index of items) {
   print(index);
   print(item);
 }
 
-a = 50;
+a = 50i;
 
 print(a);
 print(b);

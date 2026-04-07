@@ -23,6 +23,10 @@ export class Char {
     return char >= '0' && char <= '9';
   }
 
+  public static isDot(char: string): boolean {
+    return char === '.';
+  }
+
   public static isDoubleQuote(char: string): boolean {
     return char === '"';
   }
@@ -45,6 +49,10 @@ export class Char {
 
   public static isMinus(char: string): boolean {
     return char === '-';
+  }
+
+  public static isNumberSuffix(char: string): boolean {
+    return char === 'i' || char === 'f' || char === 'd';
   }
 
   public static isPlus(char: string): boolean {

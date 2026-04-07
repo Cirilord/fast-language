@@ -60,8 +60,11 @@ export type Identifier = {
 
 export type NumberLiteral = {
   kind: 'NumberLiteral';
+  numberType: NumberLiteralType;
   value: number;
 };
+
+export type NumberLiteralType = 'double' | 'float' | 'int';
 
 export type StringLiteral = {
   kind: 'StringLiteral';

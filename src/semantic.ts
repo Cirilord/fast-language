@@ -2,18 +2,21 @@ import type {
   ArrayLiteral,
   AssignmentStatement,
   BinaryExpression,
+  BinaryOperator,
   CallExpression,
   Expression,
   ExpressionStatement,
   ForStatement,
   Identifier,
+  NumberLiteral,
+  NumberLiteralType,
   Program,
   Statement,
   VariableDeclaration,
 } from './ast';
 import { createReferenceError, createSyntaxError, createTypeError } from './errors';
 
-type SemanticType = 'array' | 'function' | 'null' | 'number' | 'string' | 'unknown';
+type SemanticType = 'array' | 'function' | 'null' | NumberLiteralType | 'string' | 'unknown';
 
 type SemanticSymbol = {
   callable: boolean;
@@ -21,6 +24,30 @@ type SemanticSymbol = {
   name: string;
   type: SemanticType;
 };
+
+function isNumericType(type: SemanticType): type is NumberLiteralType {
+  return type === 'double' || type === 'float' || type === 'int';
+}
+
+function promoteNumericType(
+  operator: BinaryOperator,
+  leftType: NumberLiteralType,
+  rightType: NumberLiteralType
+): NumberLiteralType {
+  if (leftType === 'double' || rightType === 'double') {
+    return 'double';
+  }
+
+  if (leftType === 'float' || rightType === 'float') {
+    return 'float';
+  }
+
+  if (operator === '/') {
+    return 'double';
+  }
+
+  return 'int';
+}
 
 class SemanticScope {
   private readonly symbols = new Map<string, SemanticSymbol>();
@@ -100,11 +127,11 @@ export class SemanticAnalyzer {
     const leftType = this.analyzeExpression(expression.left);
     const rightType = this.analyzeExpression(expression.right);
 
-    if (leftType !== 'number' || rightType !== 'number') {
+    if (!isNumericType(leftType) || !isNumericType(rightType)) {
       throw createTypeError(`Operator '${expression.operator}' expects number operands`);
     }
 
-    return 'number';
+    return promoteNumericType(expression.operator, leftType, rightType);
   }
 
   private analyzeCallExpression(expression: CallExpression): SemanticType {
@@ -132,7 +159,7 @@ export class SemanticAnalyzer {
       case 'Identifier':
         return this.analyzeIdentifier(expression);
       case 'NumberLiteral':
-        return this.analyzeNumberLiteral();
+        return this.analyzeNumberLiteral(expression);
       case 'StringLiteral':
         return this.analyzeStringLiteral();
     }
@@ -166,7 +193,7 @@ export class SemanticAnalyzer {
             callable: false,
             mutable: false,
             name: statement.index.name,
-            type: 'number',
+            type: 'int',
           },
           statement.index.location
         );
@@ -182,8 +209,8 @@ export class SemanticAnalyzer {
     return this.scope.lookup(expression.name, expression.location).type;
   }
 
-  private analyzeNumberLiteral(): SemanticType {
-    return 'number';
+  private analyzeNumberLiteral(expression: NumberLiteral): SemanticType {
+    return expression.numberType;
   }
 
   private analyzeStatement(statement: Statement): void {

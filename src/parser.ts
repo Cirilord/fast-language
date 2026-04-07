@@ -9,6 +9,7 @@ import type {
   ForStatement,
   Identifier,
   NumberLiteral,
+  NumberLiteralType,
   Program,
   Statement,
   StringLiteral,
@@ -75,11 +76,36 @@ export class Parser {
     };
   }
 
+  private createNumberLiteral(token: Token): NumberLiteral {
+    const suffix = token.lexeme.at(-1);
+
+    if (suffix !== 'i' && suffix !== 'f' && suffix !== 'd') {
+      throw this.error(token, "Expected number literal suffix 'i', 'f', or 'd'.");
+    }
+
+    return {
+      kind: 'NumberLiteral',
+      numberType: this.getNumberLiteralType(suffix),
+      value: Number(token.lexeme.slice(0, -1)),
+    };
+  }
+
   private error(token: Token, message: string): Error {
     return createSyntaxError(`${message} Found '${token.lexeme || token.type}'`, {
       column: token.column,
       line: token.line,
     });
+  }
+
+  private getNumberLiteralType(suffix: 'd' | 'f' | 'i'): NumberLiteralType {
+    switch (suffix) {
+      case 'd':
+        return 'double';
+      case 'f':
+        return 'float';
+      case 'i':
+        return 'int';
+    }
   }
 
   private isAtEnd(): boolean {
@@ -230,10 +256,7 @@ export class Parser {
     }
 
     if (this.match(TokenType.Number)) {
-      return {
-        kind: 'NumberLiteral',
-        value: Number(this.previous().lexeme),
-      } satisfies NumberLiteral;
+      return this.createNumberLiteral(this.previous());
     }
 
     if (this.match(TokenType.String)) {
