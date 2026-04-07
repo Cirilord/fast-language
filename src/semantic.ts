@@ -63,6 +63,10 @@ function promoteNumericType(leftType: NumberLiteralType, rightType: NumberLitera
 
 function toBinaryOperator(operator: AssignmentOperator): BinaryOperator {
   switch (operator) {
+    case '&&=':
+    case '??=':
+    case '||=':
+      throw createTypeError(`Logical assignment operator '${operator}' cannot be converted to a binary operator`);
     case '%=':
       return '%';
     case '*=':
@@ -154,6 +158,30 @@ export class SemanticAnalyzer {
       if (!areTypesCompatible(symbol.type, type)) {
         throw createTypeError(
           `Cannot assign value of type '${type}' to binding '${statement.identifier.name}' of type '${symbol.type}'`,
+          statement.identifier.location
+        );
+      }
+
+      this.scope.assign(statement.identifier.name, statement.identifier.location);
+      return;
+    }
+
+    if (statement.operator === '??=') {
+      if (!areTypesCompatible(symbol.type, type)) {
+        throw createTypeError(
+          `Cannot assign value of type '${type}' to binding '${statement.identifier.name}' of type '${symbol.type}'`,
+          statement.identifier.location
+        );
+      }
+
+      this.scope.assign(statement.identifier.name, statement.identifier.location);
+      return;
+    }
+
+    if (statement.operator === '&&=' || statement.operator === '||=') {
+      if (symbol.type !== 'boolean' || (type !== 'boolean' && type !== 'unknown')) {
+        throw createTypeError(
+          `Operator '${statement.operator}' expects boolean operands`,
           statement.identifier.location
         );
       }

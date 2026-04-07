@@ -46,7 +46,7 @@ export type ExpressionStatement = {
 
 export type BinaryOperator = '!=' | '%' | '*' | '+' | '-' | '/' | '<' | '<=' | '==' | '>' | '>=';
 
-export type AssignmentOperator = '%=' | '*=' | '+=' | '-=' | '/=' | '=';
+export type AssignmentOperator = '&&=' | '%=' | '*=' | '+=' | '-=' | '/=' | '=' | '??=' | '||=';
 
 export type UnaryOperator = '-';
 

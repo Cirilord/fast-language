@@ -48,6 +48,23 @@ export class Lexer {
         });
       }
 
+      if (Char.isAmpersand(char)) {
+        if (Char.isAmpersand(this.peek())) {
+          this.advance();
+
+          if (Char.isEquals(this.peek())) {
+            this.advance();
+            tokens.push(this.makeToken(TokenType.AmpersandAmpersandEquals, '&&=', startColumn));
+            continue;
+          }
+        }
+
+        throw createSyntaxError("Unexpected character '&'. Did you mean '&&='?", {
+          column: startColumn,
+          line: this.line,
+        });
+      }
+
       if (Char.isEquals(char)) {
         if (Char.isEquals(this.peek())) {
           this.advance();
@@ -149,6 +166,40 @@ export class Lexer {
       if (Char.isComma(char)) {
         tokens.push(this.makeToken(TokenType.Comma, char, startColumn));
         continue;
+      }
+
+      if (Char.isPipe(char)) {
+        if (Char.isPipe(this.peek())) {
+          this.advance();
+
+          if (Char.isEquals(this.peek())) {
+            this.advance();
+            tokens.push(this.makeToken(TokenType.PipePipeEquals, '||=', startColumn));
+            continue;
+          }
+        }
+
+        throw createSyntaxError("Unexpected character '|'. Did you mean '||='?", {
+          column: startColumn,
+          line: this.line,
+        });
+      }
+
+      if (Char.isQuestion(char)) {
+        if (Char.isQuestion(this.peek())) {
+          this.advance();
+
+          if (Char.isEquals(this.peek())) {
+            this.advance();
+            tokens.push(this.makeToken(TokenType.QuestionQuestionEquals, '??=', startColumn));
+            continue;
+          }
+        }
+
+        throw createSyntaxError("Unexpected character '?'. Did you mean '??='?", {
+          column: startColumn,
+          line: this.line,
+        });
       }
 
       if (Char.isLeftBracket(char)) {

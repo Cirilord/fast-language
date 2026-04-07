@@ -20,6 +20,8 @@ This file tracks working conventions for the `fast` language project so future c
 - Arithmetic operators currently expect number operands, including `%` for modulo.
 - Comparison operators `>`, `>=`, `<`, `<=`, `==`, and `!=` return booleans.
 - Compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands.
+- Logical assignment operators `&&=` and `||=` expect boolean operands.
+- Nullish assignment `??=` assigns only when the current value is `null`.
 - Parentheses can group arithmetic expressions.
 - Unary `-` can be used with numbers and grouped numeric expressions.
 - Number literals no longer use suffixes; numeric variable types are `int`, `float`, and `double`.

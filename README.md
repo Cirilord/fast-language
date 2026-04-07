@@ -10,6 +10,7 @@ Right now the project is implemented in TypeScript and already supports:
 - arithmetic expressions with `+`, `-`, `*`, `/`, `%`, unary `-`, and grouped expressions with `(...)`
 - comparison expressions with `>`, `>=`, `<`, `<=`, `==`, and `!=`
 - compound assignment operators with `+=`, `-=`, `*=`, `/=`, and `%=`
+- logical assignment operators with `&&=`, `||=`, and `??=`
 - typed numeric declarations like `var count: int = 10;`
 - typed variable declarations like `var name: string = "Fast";`
 - contextual `null` values like `var name: string = null;`
@@ -41,12 +42,17 @@ val precise: double = 30.0;
 var nullableText: string = null;
 var x: int = 10;
 var counter: int = 0;
+var shouldPrint: boolean = 10 > 5;
+var shouldFallback: boolean = 5 > 10;
 
 x += 5;
 x -= 2;
 x *= 3;
 x %= 5;
 x /= 2;
+shouldPrint &&= 10 == 10;
+shouldFallback ||= 10 == 10;
+nullableText ??= "Fallback text";
 
 for (var item, index of items) {
   print(index);
@@ -68,6 +74,8 @@ print(price);
 print(precise);
 print(nullableText);
 print(x);
+print(shouldPrint);
+print(shouldFallback);
 ```
 
 ## Project Flow
@@ -121,6 +129,8 @@ Then open a `.fast` file in the extension development window.
 - only `var` can be reassigned
 - arithmetic operators currently expect number operands
 - compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands
+- logical assignment operators `&&=` and `||=` expect boolean operands
+- nullish assignment `??=` assigns only when the current value is `null`
 - comparison operators `>`, `>=`, `<`, and `<=` expect number operands and return booleans
 - equality operators `==` and `!=` return booleans
 - unary `-` can be used with numbers, including grouped expressions like `-(5 + 2)`

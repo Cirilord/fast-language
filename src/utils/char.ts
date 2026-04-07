@@ -7,6 +7,10 @@ export class Char {
     return Char.isAlpha(char) || Char.isDigit(char);
   }
 
+  public static isAmpersand(char: string): boolean {
+    return char === '&';
+  }
+
   public static isBacktick(char: string): boolean {
     return char === '`';
   }
@@ -71,8 +75,16 @@ export class Char {
     return char === '%';
   }
 
+  public static isPipe(char: string): boolean {
+    return char === '|';
+  }
+
   public static isPlus(char: string): boolean {
     return char === '+';
+  }
+
+  public static isQuestion(char: string): boolean {
+    return char === '?';
   }
 
   public static isRightBrace(char: string): boolean {

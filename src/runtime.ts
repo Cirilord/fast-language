@@ -107,6 +107,10 @@ function isEqualityOperator(operator: BinaryOperator): boolean {
 
 function toBinaryOperator(operator: AssignmentOperator): BinaryOperator {
   switch (operator) {
+    case '&&=':
+    case '??=':
+    case '||=':
+      throw createTypeError(`Logical assignment operator '${operator}' cannot be converted to a binary operator`);
     case '%=':
       return '%';
     case '*=':
@@ -197,6 +201,10 @@ function evaluateCompoundAssignment(
   const numberType = promoteNumberType(binaryOperator, current.numberType, value.numberType);
 
   switch (operator) {
+    case '&&=':
+    case '??=':
+    case '||=':
+      throw createTypeError(`Logical assignment operator '${operator}' cannot be evaluated as numeric assignment`);
     case '%=':
       return { numberType, type: 'number', value: current.value % value.value };
     case '*=':
@@ -250,13 +258,35 @@ export class Interpreter {
   }
 
   private evaluateAssignmentValue(statement: AssignmentStatement): RuntimeValue {
-    const value = this.evaluateExpression(statement.value);
-
     if (statement.operator === '=') {
-      return value;
+      return this.evaluateExpression(statement.value);
     }
 
     const current = this.scope.lookup(statement.identifier.name);
+
+    if (statement.operator === '??=') {
+      return current.type === 'null' ? this.evaluateExpression(statement.value) : current;
+    }
+
+    if (statement.operator === '&&=' || statement.operator === '||=') {
+      if (current.type !== 'boolean') {
+        throw createTypeError(`Operator '${statement.operator}' expects boolean operands`);
+      }
+
+      if ((statement.operator === '&&=' && !current.value) || (statement.operator === '||=' && current.value)) {
+        return current;
+      }
+
+      const value = this.evaluateExpression(statement.value);
+
+      if (value.type !== 'boolean') {
+        throw createTypeError(`Operator '${statement.operator}' expects boolean operands`);
+      }
+
+      return value;
+    }
+
+    const value = this.evaluateExpression(statement.value);
 
     if (current.type !== 'number' || value.type !== 'number') {
       throw createTypeError(`Operator '${statement.operator}' expects number operands`);

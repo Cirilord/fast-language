@@ -125,7 +125,10 @@ export class Parser {
       type === TokenType.MinusEquals ||
       type === TokenType.StarEquals ||
       type === TokenType.SlashEquals ||
-      type === TokenType.PercentEquals
+      type === TokenType.PercentEquals ||
+      type === TokenType.AmpersandAmpersandEquals ||
+      type === TokenType.PipePipeEquals ||
+      type === TokenType.QuestionQuestionEquals
     );
   }
 
