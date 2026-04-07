@@ -11,6 +11,7 @@ Right now the project is implemented in TypeScript and already supports:
 - typed number literals with required suffixes: `10i`, `20.0f`, `30.0d`
 - string literals with `"`
 - multiline strings with `` ` ``
+- line comments with `//`
 - array literals with `[value, value]`
 - `for ... of` loops with optional index binding
 - generic function-call parsing like `print(a);`
@@ -21,6 +22,7 @@ Right now the project is implemented in TypeScript and already supports:
 `main.fast`
 
 ```fast
+// Number literals must include a type suffix.
 val items = ["first", "second", "third"];
 val result = (10i + 5i) * 2i;
 
@@ -75,6 +77,7 @@ yarn format
 - arithmetic promotes mixed numeric types, and division between integers produces a `double`
 - normal strings must use `"`
 - multiline strings must use `` ` ``
+- line comments start with `//` and run until the end of the line
 - arrays use `[value, value]`
 - `for` loops use `for (var element of array) { ... }`
 - `for` loops can access index with `for (var element, index of array) { ... }`

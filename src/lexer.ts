@@ -54,6 +54,11 @@ export class Lexer {
       }
 
       if (Char.isSlash(char)) {
+        if (Char.isSlash(this.peek())) {
+          this.skipLineComment();
+          continue;
+        }
+
         tokens.push(this.makeToken(TokenType.Slash, char, startColumn));
         continue;
       }
@@ -240,5 +245,11 @@ export class Lexer {
 
     this.advance();
     return this.makeToken(TokenType.String, lexeme, startColumn);
+  }
+
+  private skipLineComment(): void {
+    while (!this.isAtEnd() && !Char.isBreakline(this.peek())) {
+      this.advance();
+    }
   }
 }

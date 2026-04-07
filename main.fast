@@ -1,12 +1,13 @@
+// Number literals must include a type suffix.
 var a = 30i;
 val b = "Test";
 val items = ["first", "second", "third"];
 val result = (10i + 5i) * 2i;
 
-for (var item, index of items) {
-  print(index);
-  print(item);
-}
+// for (var item, index of items) {
+//   print(index);
+//   print(item);
+// }
 
 a = 50i;
 

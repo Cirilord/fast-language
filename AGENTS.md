@@ -24,6 +24,7 @@ This file tracks working conventions for the `fast` language project so future c
 - `print` is not a lexer keyword; it is tokenized as `IDENTIFIER`.
 - Normal strings use `"`.
 - Multiline strings use `` ` ``.
+- Line comments start with `//` and run until the end of the line.
 - Arrays use `[value, value]`.
 - `for` loops use `for (var element of array) { ... }`.
 - `for` loops can access index with `for (var element, index of array) { ... }`.
