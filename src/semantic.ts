@@ -9,17 +9,17 @@ import type {
   ExpressionStatement,
   ForStatement,
   Identifier,
-  NullLiteral,
   NumberLiteral,
   NumberLiteralType,
   Program,
   Statement,
+  TypeName,
   UnaryExpression,
   VariableDeclaration,
 } from './ast';
 import { createReferenceError, createSyntaxError, createTypeError } from './errors';
 
-type SemanticType = 'array' | 'boolean' | 'function' | 'null' | NumberLiteralType | 'string' | 'unknown';
+type SemanticType = 'function' | 'null' | TypeName | 'unknown';
 
 type SemanticSymbol = {
   callable: boolean;
@@ -32,6 +32,14 @@ function isNumericType(type: SemanticType): type is NumberLiteralType {
   return type === 'double' || type === 'float' || type === 'int';
 }
 
+function areTypesCompatible(expectedType: SemanticType, actualType: SemanticType): boolean {
+  if (actualType === 'null' || actualType === 'unknown' || expectedType === actualType) {
+    return true;
+  }
+
+  return expectedType === 'float' && actualType === 'double';
+}
+
 function isEqualityOperator(operator: BinaryOperator): boolean {
   return operator === '==' || operator === '!=';
 }
@@ -40,21 +48,13 @@ function isRelationalOperator(operator: BinaryOperator): boolean {
   return operator === '>' || operator === '>=' || operator === '<' || operator === '<=';
 }
 
-function promoteNumericType(
-  operator: BinaryOperator,
-  leftType: NumberLiteralType,
-  rightType: NumberLiteralType
-): NumberLiteralType {
+function promoteNumericType(leftType: NumberLiteralType, rightType: NumberLiteralType): SemanticType {
   if (leftType === 'double' || rightType === 'double') {
     return 'double';
   }
 
   if (leftType === 'float' || rightType === 'float') {
     return 'float';
-  }
-
-  if (operator === '/') {
-    return 'double';
   }
 
   return 'int';
@@ -82,7 +82,7 @@ class SemanticScope {
 
   public constructor(private readonly parent?: SemanticScope) {}
 
-  public assign(name: string, type: SemanticType, location?: Identifier['location']): SemanticSymbol {
+  public assign(name: string, location?: Identifier['location']): SemanticSymbol {
     const symbol = this.resolve(name);
 
     if (symbol === undefined) {
@@ -93,7 +93,6 @@ class SemanticScope {
       throw createTypeError(`Cannot reassign immutable binding '${name}'`, location);
     }
 
-    symbol.type = type;
     return symbol;
   }
 
@@ -148,13 +147,19 @@ export class SemanticAnalyzer {
 
   private analyzeAssignmentStatement(statement: AssignmentStatement): void {
     const type = this.analyzeExpression(statement.value);
+    const symbol = this.scope.lookup(statement.identifier.name, statement.identifier.location);
 
     if (statement.operator === '=') {
-      this.scope.assign(statement.identifier.name, type, statement.identifier.location);
+      if (!areTypesCompatible(symbol.type, type)) {
+        throw createTypeError(
+          `Cannot assign value of type '${type}' to binding '${statement.identifier.name}' of type '${symbol.type}'`,
+          statement.identifier.location
+        );
+      }
+
+      this.scope.assign(statement.identifier.name, statement.identifier.location);
       return;
     }
-
-    const symbol = this.scope.lookup(statement.identifier.name, statement.identifier.location);
 
     if (!symbol.mutable) {
       throw createTypeError(
@@ -167,8 +172,8 @@ export class SemanticAnalyzer {
       throw createTypeError(`Operator '${statement.operator}' expects number operands`, statement.identifier.location);
     }
 
-    const assignedType = promoteNumericType(toBinaryOperator(statement.operator), symbol.type, type);
-    this.scope.assign(statement.identifier.name, assignedType, statement.identifier.location);
+    toBinaryOperator(statement.operator);
+    this.scope.assign(statement.identifier.name, statement.identifier.location);
   }
 
   private analyzeBinaryExpression(expression: BinaryExpression): SemanticType {
@@ -199,7 +204,7 @@ export class SemanticAnalyzer {
       throw createTypeError(`Operator '${expression.operator}' expects number operands`);
     }
 
-    return promoteNumericType(expression.operator, leftType, rightType);
+    return promoteNumericType(leftType, rightType);
   }
 
   private analyzeCallExpression(expression: CallExpression): SemanticType {
@@ -229,7 +234,7 @@ export class SemanticAnalyzer {
       case 'NumberLiteral':
         return this.analyzeNumberLiteral(expression);
       case 'NullLiteral':
-        return this.analyzeNullLiteral(expression);
+        return this.analyzeNullLiteral();
       case 'StringLiteral':
         return this.analyzeStringLiteral();
       case 'UnaryExpression':
@@ -281,8 +286,8 @@ export class SemanticAnalyzer {
     return this.scope.lookup(expression.name, expression.location).type;
   }
 
-  private analyzeNullLiteral(expression: NullLiteral): SemanticType {
-    return expression.nullType;
+  private analyzeNullLiteral(): SemanticType {
+    return 'null';
   }
 
   private analyzeNumberLiteral(expression: NumberLiteral): SemanticType {
@@ -322,12 +327,20 @@ export class SemanticAnalyzer {
 
   private analyzeVariableDeclaration(statement: VariableDeclaration): void {
     const type = this.analyzeExpression(statement.initializer);
+
+    if (!areTypesCompatible(statement.typeAnnotation, type)) {
+      throw createTypeError(
+        `Cannot initialize binding '${statement.identifier.name}' of type '${statement.typeAnnotation}' with value of type '${type}'`,
+        statement.identifier.location
+      );
+    }
+
     this.scope.define(
       {
         callable: false,
         mutable: statement.declarationType === 'var',
         name: statement.identifier.name,
-        type,
+        type: statement.typeAnnotation,
       },
       statement.identifier.location
     );

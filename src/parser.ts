@@ -11,7 +11,6 @@ import type {
   Identifier,
   NullLiteral,
   NumberLiteral,
-  NumberLiteralType,
   Program,
   Statement,
   StringLiteral,
@@ -85,16 +84,10 @@ export class Parser {
   }
 
   private createNumberLiteral(token: Token): NumberLiteral {
-    const suffix = token.lexeme.at(-1);
-
-    if (suffix !== 'i' && suffix !== 'f' && suffix !== 'd') {
-      throw this.error(token, "Expected number literal suffix 'i', 'f', or 'd'.");
-    }
-
     return {
       kind: 'NumberLiteral',
-      numberType: this.getNumberLiteralType(suffix),
-      value: Number(token.lexeme.slice(0, -1)),
+      numberType: token.lexeme.includes('.') ? 'double' : 'int',
+      value: Number(token.lexeme),
     };
   }
 
@@ -103,17 +96,6 @@ export class Parser {
       column: token.column,
       line: token.line,
     });
-  }
-
-  private getNumberLiteralType(suffix: 'd' | 'f' | 'i'): NumberLiteralType {
-    switch (suffix) {
-      case 'd':
-        return 'double';
-      case 'f':
-        return 'float';
-      case 'i':
-        return 'int';
-    }
   }
 
   private getTypeName(token: Token): TypeName {
@@ -316,12 +298,8 @@ export class Parser {
   }
 
   private parseNullLiteral(): NullLiteral {
-    this.consume(TokenType.As, "Expected 'as' after null literal.");
-    const type = this.consume(TokenType.Identifier, "Expected type name after 'as'.");
-
     return {
       kind: 'NullLiteral',
-      nullType: this.getTypeName(type),
     };
   }
 
@@ -418,6 +396,8 @@ export class Parser {
 
   private parseVariableDeclaration(declarationType: 'var' | 'val'): VariableDeclaration {
     const name = this.consume(TokenType.Identifier, `Expected identifier after '${declarationType}'.`);
+    this.consume(TokenType.Colon, "Expected ':' after variable name.");
+    const type = this.consume(TokenType.Identifier, "Expected type name after ':'.");
 
     this.consume(TokenType.Equals, "Expected '=' after variable name.");
     const initializer = this.parseExpression();
@@ -428,6 +408,7 @@ export class Parser {
       identifier: this.createIdentifier(name),
       initializer,
       kind: 'VariableDeclaration',
+      typeAnnotation: this.getTypeName(type),
     };
   }
 

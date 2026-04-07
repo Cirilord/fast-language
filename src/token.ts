@@ -1,6 +1,6 @@
 export enum TokenType {
-  As = 'AS',
   BangEqual = 'BANG_EQUAL',
+  Colon = 'COLON',
   Comma = 'COMMA',
   EOF = 'EOF',
   EqualEqual = 'EQUAL_EQUAL',

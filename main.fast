@@ -1,28 +1,30 @@
-// Number literals must include a type suffix.
-var a = 30i;
-val b = "Test";
-val items = ["first", "second", "third"];
-val result = (10i + 5i) * 2i;
-val directNegative = -10i;
-val negative = -(5i + 2i);
-val rest = 10i % 3i;
-val isBigger = 10i > 5i;
-val isEqual = 10i == 10i;
-var nullableText = null as string;
-var x = 10i;
+// Number types are declared on variables.
+var a: int = 30;
+val b: string = "Test";
+val items: array = ["first", "second", "third"];
+val result: int = (10 + 5) * 2;
+val directNegative: int = -10;
+val negative: int = -(5 + 2);
+val rest: int = 10 % 3;
+val isBigger: boolean = 10 > 5;
+val isEqual: boolean = 10 == 10;
+val price: float = 20.0;
+val precise: double = 30.0;
+var nullableText: string = null;
+var x: int = 10;
 
-x += 5i;
-x -= 2i;
-x *= 3i;
-x %= 5i;
-x /= 2i;
+x += 5;
+x -= 2;
+x *= 3;
+x %= 5;
+x /= 2;
 
 // for (var item, index of items) {
 //   print(index);
 //   print(item);
 // }
 
-a = 50i;
+a = 50;
 
 print(a);
 print(b);
@@ -32,5 +34,7 @@ print(negative);
 print(rest);
 print(isBigger);
 print(isEqual);
+print(price);
+print(precise);
 print(nullableText);
 print(x);

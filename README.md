@@ -10,8 +10,9 @@ Right now the project is implemented in TypeScript and already supports:
 - arithmetic expressions with `+`, `-`, `*`, `/`, `%`, unary `-`, and grouped expressions with `(...)`
 - comparison expressions with `>`, `>=`, `<`, `<=`, `==`, and `!=`
 - compound assignment operators with `+=`, `-=`, `*=`, `/=`, and `%=`
-- typed number literals with required suffixes: `10i`, `20.0f`, `30.0d`
-- typed null literals with `null as type`
+- typed numeric declarations like `var count: int = 10;`
+- typed variable declarations like `var name: string = "Fast";`
+- contextual `null` values like `var name: string = null;`
 - string literals with `"`
 - multiline strings with `` ` ``
 - line comments with `//`
@@ -26,22 +27,24 @@ Right now the project is implemented in TypeScript and already supports:
 `main.fast`
 
 ```fast
-// Number literals must include a type suffix.
-val items = ["first", "second", "third"];
-val result = (10i + 5i) * 2i;
-val directNegative = -10i;
-val negative = -(5i + 2i);
-val rest = 10i % 3i;
-val isBigger = 10i > 5i;
-val isEqual = 10i == 10i;
-var nullableText = null as string;
-var x = 10i;
+// Number types are declared on variables.
+val items: array = ["first", "second", "third"];
+val result: int = (10 + 5) * 2;
+val directNegative: int = -10;
+val negative: int = -(5 + 2);
+val rest: int = 10 % 3;
+val isBigger: boolean = 10 > 5;
+val isEqual: boolean = 10 == 10;
+val price: float = 20.0;
+val precise: double = 30.0;
+var nullableText: string = null;
+var x: int = 10;
 
-x += 5i;
-x -= 2i;
-x *= 3i;
-x %= 5i;
-x /= 2i;
+x += 5;
+x -= 2;
+x *= 3;
+x %= 5;
+x /= 2;
 
 for (var item, index of items) {
   print(index);
@@ -54,6 +57,8 @@ print(negative);
 print(rest);
 print(isBigger);
 print(isEqual);
+print(price);
+print(precise);
 print(nullableText);
 print(x);
 ```
@@ -111,13 +116,14 @@ Then open a `.fast` file in the extension development window.
 - compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands
 - comparison operators `>`, `>=`, `<`, and `<=` expect number operands and return booleans
 - equality operators `==` and `!=` return booleans
-- unary `-` can be used with numbers, including grouped expressions like `-(5i + 2i)`
+- unary `-` can be used with numbers, including grouped expressions like `-(5 + 2)`
 - parentheses can be used to group arithmetic expressions
-- number literals must include a type suffix: `i` for integer, `f` for float, or `d` for double
-- integer literals cannot include a decimal point; use `20.0f` or `20.0d` for decimal values
-- arithmetic promotes mixed numeric types, and division between integers produces a `double`
-- `null` must declare the expected type with `as`, like `null as string`
-- accepted `null as` types are `array`, `boolean`, `double`, `float`, `int`, and `string`
+- integer literals do not use decimal points, like `10`
+- decimal literals use decimal points, like `20.0`
+- numeric variable types are `int`, `float`, and `double`
+- variable declarations must include a type annotation, like `var name: string = "Fast";`
+- accepted variable types are `array`, `boolean`, `double`, `float`, `int`, and `string`
+- `null` uses the declared variable type, like `var name: string = null;`
 - normal strings must use `"`
 - multiline strings must use `` ` ``
 - line comments start with `//` and run until the end of the line

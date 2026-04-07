@@ -3,7 +3,6 @@ import { type Token, TokenType } from './token';
 import { Char } from './utils/char';
 
 const KEYWORDS: Record<string, TokenType> = {
-  as: TokenType.As,
   for: TokenType.For,
   null: TokenType.Null,
   of: TokenType.Of,
@@ -78,6 +77,11 @@ export class Lexer {
         }
 
         tokens.push(this.makeToken(TokenType.Less, char, startColumn));
+        continue;
+      }
+
+      if (Char.isColon(char)) {
+        tokens.push(this.makeToken(TokenType.Colon, char, startColumn));
         continue;
       }
 
@@ -256,14 +260,12 @@ export class Lexer {
 
   private readNumber(firstChar: string, startColumn: number): Token {
     let lexeme = firstChar;
-    let hasDecimalPoint = false;
 
     while (!this.isAtEnd() && Char.isDigit(this.peek())) {
       lexeme += this.advance();
     }
 
     if (!this.isAtEnd() && Char.isDot(this.peek())) {
-      hasDecimalPoint = true;
       lexeme += this.advance();
 
       if (this.isAtEnd() || !Char.isDigit(this.peek())) {
@@ -277,24 +279,6 @@ export class Lexer {
         lexeme += this.advance();
       }
     }
-
-    if (this.isAtEnd() || !Char.isNumberSuffix(this.peek())) {
-      throw createSyntaxError("Number literal must include a type suffix: 'i', 'f', or 'd'", {
-        column: startColumn,
-        line: this.line,
-      });
-    }
-
-    const suffix = this.advance();
-
-    if (suffix === 'i' && hasDecimalPoint) {
-      throw createSyntaxError("Integer literal cannot include a decimal point. Use 'f' or 'd' instead", {
-        column: startColumn,
-        line: this.line,
-      });
-    }
-
-    lexeme += suffix;
 
     return this.makeToken(TokenType.Number, lexeme, startColumn);
   }

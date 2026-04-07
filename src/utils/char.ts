@@ -19,6 +19,10 @@ export class Char {
     return char === '\n';
   }
 
+  public static isColon(char: string): boolean {
+    return char === ':';
+  }
+
   public static isComma(char: string): boolean {
     return char === ',';
   }
@@ -61,10 +65,6 @@ export class Char {
 
   public static isMinus(char: string): boolean {
     return char === '-';
-  }
-
-  public static isNumberSuffix(char: string): boolean {
-    return char === 'i' || char === 'f' || char === 'd';
   }
 
   public static isPercent(char: string): boolean {

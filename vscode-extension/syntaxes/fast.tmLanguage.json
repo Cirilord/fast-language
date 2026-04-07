@@ -50,7 +50,7 @@
         },
         {
           "name": "keyword.control.fast",
-          "match": "\\b(?:as|for|of)\\b"
+          "match": "\\b(?:for|of)\\b"
         },
         {
           "name": "constant.language.null.fast",
@@ -65,16 +65,12 @@
     "numbers": {
       "patterns": [
         {
-          "name": "constant.numeric.integer.fast",
-          "match": "\\b\\d+i\\b"
-        },
-        {
-          "name": "constant.numeric.float.fast",
-          "match": "\\b\\d+(?:\\.\\d+)?f\\b"
-        },
-        {
           "name": "constant.numeric.double.fast",
-          "match": "\\b\\d+(?:\\.\\d+)?d\\b"
+          "match": "\\b\\d+\\.\\d+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.fast",
+          "match": "\\b\\d+\\b"
         }
       ]
     },
@@ -103,6 +99,10 @@
         {
           "name": "punctuation.separator.comma.fast",
           "match": ","
+        },
+        {
+          "name": "punctuation.separator.type-annotation.fast",
+          "match": ":"
         },
         {
           "name": "punctuation.section.braces.fast",

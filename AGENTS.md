@@ -22,11 +22,11 @@ This file tracks working conventions for the `fast` language project so future c
 - Compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands.
 - Parentheses can group arithmetic expressions.
 - Unary `-` can be used with numbers and grouped numeric expressions.
-- Number literals must include a type suffix: `i` for integer, `f` for float, or `d` for double.
-- Integer literals cannot include a decimal point; use `f` or `d` for decimal values.
-- Arithmetic promotes mixed numeric types, and division between integers produces a `double`.
-- `null` must declare the expected type with `as`, like `null as string`.
-- Accepted `null as` types are `array`, `boolean`, `double`, `float`, `int`, and `string`.
+- Number literals no longer use suffixes; numeric variable types are `int`, `float`, and `double`.
+- Integer literals do not use decimal points, like `10`; decimal literals use decimal points, like `20.0`.
+- Variable declarations must include a type annotation, like `var name: string = "Fast";`.
+- Accepted variable types are `array`, `boolean`, `double`, `float`, `int`, and `string`.
+- `null` uses the declared variable type, like `var name: string = null;`.
 - `print` is not a lexer keyword; it is tokenized as `IDENTIFIER`.
 - Normal strings use `"`.
 - Multiline strings use `` ` ``.

@@ -30,6 +30,7 @@ export type VariableDeclaration = {
   identifier: Identifier;
   initializer: Expression;
   kind: 'VariableDeclaration';
+  typeAnnotation: TypeName;
 };
 
 export type ExpressionStatement = {
@@ -81,7 +82,6 @@ export type NumberLiteralType = 'double' | 'float' | 'int';
 
 export type NullLiteral = {
   kind: 'NullLiteral';
-  nullType: TypeName;
 };
 
 export type StringLiteral = {

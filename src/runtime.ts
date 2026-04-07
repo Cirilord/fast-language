@@ -8,7 +8,6 @@ import type {
   Expression,
   ForStatement,
   Identifier,
-  NullLiteral,
   NumberLiteral,
   NumberLiteralType,
   Program,
@@ -22,6 +21,7 @@ import { createReferenceError, createTypeError } from './errors';
 
 type Binding = {
   mutable: boolean;
+  typeAnnotation?: TypeName;
   value: RuntimeValue;
 };
 
@@ -42,7 +42,6 @@ export type NativeFunctionValue = {
 };
 
 export type NullValue = {
-  nullType: TypeName | null;
   type: 'null';
   value: null;
 };
@@ -122,6 +121,21 @@ function toBinaryOperator(operator: AssignmentOperator): BinaryOperator {
   }
 }
 
+function isNumericTypeAnnotation(typeAnnotation: TypeName | undefined): typeAnnotation is NumberLiteralType {
+  return typeAnnotation === 'double' || typeAnnotation === 'float' || typeAnnotation === 'int';
+}
+
+function coerceValueToBindingType(value: RuntimeValue, typeAnnotation: TypeName | undefined): RuntimeValue {
+  if (value.type === 'number' && isNumericTypeAnnotation(typeAnnotation)) {
+    return {
+      ...value,
+      numberType: typeAnnotation,
+    };
+  }
+
+  return value;
+}
+
 class Scope {
   private readonly bindings = new Map<string, Binding>();
 
@@ -138,17 +152,24 @@ class Scope {
       throw createTypeError(`Cannot reassign immutable binding '${name}'`);
     }
 
-    binding.value = value;
-    return value;
+    binding.value = coerceValueToBindingType(value, binding.typeAnnotation);
+    return binding.value;
   }
 
-  public define(name: string, value: RuntimeValue, mutable: boolean): RuntimeValue {
+  public define(name: string, value: RuntimeValue, mutable: boolean, typeAnnotation?: TypeName): RuntimeValue {
     if (this.bindings.has(name)) {
       throw createTypeError(`Binding '${name}' is already defined`);
     }
 
-    this.bindings.set(name, { mutable, value });
-    return value;
+    const bindingValue = coerceValueToBindingType(value, typeAnnotation);
+    const binding: Binding = { mutable, value: bindingValue };
+
+    if (typeAnnotation !== undefined) {
+      binding.typeAnnotation = typeAnnotation;
+    }
+
+    this.bindings.set(name, binding);
+    return bindingValue;
   }
 
   public lookup(name: string): RuntimeValue {
@@ -201,7 +222,7 @@ export class Interpreter {
           const renderedArgs = args.map((arg) => this.runtimeValueToString(arg));
           console.log(...renderedArgs);
 
-          return { nullType: null, type: 'null', value: null };
+          return { type: 'null', value: null };
         },
         name: 'print',
         type: 'native-function',
@@ -211,7 +232,7 @@ export class Interpreter {
   }
 
   public execute(program: Program): RuntimeValue {
-    let lastValue: RuntimeValue = { nullType: null, type: 'null', value: null };
+    let lastValue: RuntimeValue = { type: 'null', value: null };
 
     for (const statement of program.body) {
       lastValue = this.executeStatement(statement);
@@ -341,7 +362,7 @@ export class Interpreter {
       case 'NumberLiteral':
         return this.evaluateNumberLiteral(expression);
       case 'NullLiteral':
-        return this.evaluateNullLiteral(expression);
+        return this.evaluateNullLiteral();
       case 'StringLiteral':
         return this.evaluateStringLiteral(expression);
       case 'UnaryExpression':
@@ -353,9 +374,8 @@ export class Interpreter {
     return this.scope.lookup(expression.name);
   }
 
-  private evaluateNullLiteral(expression: NullLiteral): RuntimeValue {
+  private evaluateNullLiteral(): RuntimeValue {
     return {
-      nullType: expression.nullType,
       type: 'null',
       value: null,
     };
@@ -397,7 +417,7 @@ export class Interpreter {
 
   private executeForStatement(statement: ForStatement): RuntimeValue {
     const iterable = this.evaluateExpression(statement.iterable);
-    let lastValue: RuntimeValue = { nullType: null, type: 'null', value: null };
+    let lastValue: RuntimeValue = { type: 'null', value: null };
 
     if (iterable.type !== 'array') {
       throw createTypeError('For loop iterable must be an array');
@@ -411,7 +431,7 @@ export class Interpreter {
           this.scope.define(statement.index.name, { numberType: 'int', type: 'number', value: index }, false);
         }
 
-        let bodyValue: RuntimeValue = { nullType: null, type: 'null', value: null };
+        let bodyValue: RuntimeValue = { type: 'null', value: null };
 
         for (const bodyStatement of statement.body) {
           bodyValue = this.executeStatement(bodyStatement);
@@ -440,7 +460,12 @@ export class Interpreter {
   private executeVariableDeclaration(statement: VariableDeclaration): RuntimeValue {
     const value = this.evaluateExpression(statement.initializer);
 
-    return this.scope.define(statement.identifier.name, value, statement.declarationType === 'var');
+    return this.scope.define(
+      statement.identifier.name,
+      value,
+      statement.declarationType === 'var',
+      statement.typeAnnotation
+    );
   }
 
   private runtimeValueToString(value: RuntimeValue): string {
