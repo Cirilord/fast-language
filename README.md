@@ -13,6 +13,8 @@ Right now the project is implemented in TypeScript and already supports:
 - ternary expressions with `condition ? value : value`
 - compound assignment operators with `+=`, `-=`, `*=`, `/=`, and `%=`
 - logical assignment operators with `&&=`, `||=`, and `??=`
+- function declarations with `function name(): type { return value; }`
+- `void` functions with `function name(): void { ... }`
 - typed numeric declarations like `var count: int = 10;`
 - typed variable declarations like `var name: string = "Fast";`
 - contextual `null` values like `var name: string = null;`
@@ -52,6 +54,17 @@ val canPrint: boolean = shouldPrint && shouldFallback;
 val canFallback: boolean = shouldPrint || shouldFallback;
 val fallbackText: string = nullableText ?? "Default text";
 val status: string = canFallback ? "enabled" : "disabled";
+
+function getStatus(): string {
+  return status;
+}
+
+function logStatus(): void {
+  print(status);
+  return;
+}
+
+val computedStatus: string = getStatus();
 
 x += 5;
 x -= 2;
@@ -93,6 +106,8 @@ print(canPrint);
 print(canFallback);
 print(fallbackText);
 print(status);
+print(computedStatus);
+logStatus();
 ```
 
 ## Project Flow
@@ -169,6 +184,9 @@ Then open a `.fast` file in the extension development window.
 - `for` loops can access index with `for (var element, index of array) { ... }`
 - `while` loops use `while (condition) { ... }` and the condition must be boolean
 - `do while` loops use `do { ... } while (condition);` and the condition must be boolean
+- functions use `function name(): type { return value; }`
+- function return values must match the declared return type
+- functions that do not return a value use `void`, like `function name(): void { ... }`
 - `print` is treated as an identifier in the lexer and as a builtin at runtime
 - symbol existence, callability, and `val` reassignment are checked semantically before execution
 

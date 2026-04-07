@@ -21,6 +21,17 @@ val canFallback: boolean = shouldPrint || shouldFallback;
 val fallbackText: string = nullableText ?? "Default text";
 val status: string = canFallback ? "enabled" : "disabled";
 
+function getStatus(): string {
+  return status;
+}
+
+function logStatus(): void {
+  print(status);
+  return;
+}
+
+val computedStatus: string = getStatus();
+
 x += 5;
 x -= 2;
 x *= 3;
@@ -30,10 +41,10 @@ shouldPrint &&= 10 == 10;
 shouldFallback ||= 10 == 10;
 nullableText ??= "Fallback text";
 
-// for (var item, index of items) {
-//   print(index);
-//   print(item);
-// }
+for (var item, index of items) {
+  print(index);
+  print(item);
+}
 
 while (counter < 3) {
   print(counter);
@@ -65,3 +76,5 @@ print(canPrint);
 print(canFallback);
 print(fallbackText);
 print(status);
+print(computedStatus);
+logStatus();

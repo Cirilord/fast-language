@@ -41,6 +41,9 @@ This file tracks working conventions for the `fast` language project so future c
 - `for` loops can access index with `for (var element, index of array) { ... }`.
 - `while` loops use `while (condition) { ... }`, and the condition must be boolean.
 - `do while` loops use `do { ... } while (condition);`, and the condition must be boolean.
+- Functions currently use `function name(): type { return value; }` without parameters.
+- Function return values must match the declared return type.
+- Functions that do not return a value use `void`, like `function name(): void { ... }`.
 
 ## Code Conventions
 

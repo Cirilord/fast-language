@@ -8,6 +8,8 @@ export type Statement =
   | DoWhileStatement
   | ExpressionStatement
   | ForStatement
+  | FunctionDeclaration
+  | ReturnStatement
   | VariableDeclaration
   | WhileStatement;
 
@@ -35,6 +37,18 @@ export type DoWhileStatement = {
   body: Statement[];
   condition: Expression;
   kind: 'DoWhileStatement';
+};
+
+export type FunctionDeclaration = {
+  body: Statement[];
+  identifier: Identifier;
+  kind: 'FunctionDeclaration';
+  returnType: FunctionReturnType;
+};
+
+export type ReturnStatement = {
+  kind: 'ReturnStatement';
+  value?: Expression;
 };
 
 export type VariableDeclaration = {
@@ -116,6 +130,8 @@ export type StringLiteral = {
 };
 
 export type TypeName = 'array' | 'boolean' | 'double' | 'float' | 'int' | 'string';
+
+export type FunctionReturnType = TypeName | 'void';
 
 export type UnaryExpression = {
   argument: Expression;

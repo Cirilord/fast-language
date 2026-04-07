@@ -10,10 +10,13 @@ import type {
   Expression,
   ExpressionStatement,
   ForStatement,
+  FunctionDeclaration,
+  FunctionReturnType,
   Identifier,
   NumberLiteral,
   NumberLiteralType,
   Program,
+  ReturnStatement,
   Statement,
   TypeName,
   UnaryExpression,
@@ -22,12 +25,14 @@ import type {
 } from './ast';
 import { createReferenceError, createSyntaxError, createTypeError } from './errors';
 
-type SemanticType = 'function' | 'null' | TypeName | 'unknown';
+type SemanticType = 'function' | 'null' | 'void' | TypeName | 'unknown';
 
 type SemanticSymbol = {
+  arity?: number;
   callable: boolean;
   mutable: boolean;
   name: string;
+  returnType?: SemanticType;
   type: SemanticType;
 };
 
@@ -131,6 +136,7 @@ class SemanticScope {
 }
 
 export class SemanticAnalyzer {
+  private currentReturnType: FunctionReturnType | undefined;
   private scope = new SemanticScope();
 
   public constructor() {
@@ -138,6 +144,7 @@ export class SemanticAnalyzer {
       callable: true,
       mutable: false,
       name: 'print',
+      returnType: 'unknown',
       type: 'function',
     });
   }
@@ -269,11 +276,18 @@ export class SemanticAnalyzer {
       throw createTypeError(`Binding '${expression.callee.name}' is not callable`, expression.callee.location);
     }
 
+    if (callee.arity !== undefined && expression.arguments.length !== callee.arity) {
+      throw createTypeError(
+        `Function '${expression.callee.name}' expects ${callee.arity} arguments, got ${expression.arguments.length}`,
+        expression.callee.location
+      );
+    }
+
     for (const arg of expression.arguments) {
       this.analyzeExpression(arg);
     }
 
-    return 'unknown';
+    return callee.returnType ?? 'unknown';
   }
 
   private analyzeConditionalExpression(expression: ConditionalExpression): SemanticType {
@@ -374,6 +388,40 @@ export class SemanticAnalyzer {
     });
   }
 
+  private analyzeFunctionDeclaration(statement: FunctionDeclaration): void {
+    this.scope.define(
+      {
+        arity: 0,
+        callable: true,
+        mutable: false,
+        name: statement.identifier.name,
+        returnType: statement.returnType,
+        type: 'function',
+      },
+      statement.identifier.location
+    );
+
+    const previousReturnType = this.currentReturnType;
+
+    try {
+      this.currentReturnType = statement.returnType;
+      this.withScope(() => {
+        for (const bodyStatement of statement.body) {
+          this.analyzeStatement(bodyStatement);
+        }
+      });
+    } finally {
+      this.currentReturnType = previousReturnType;
+    }
+
+    if (statement.returnType !== 'void' && !this.hasReturnStatement(statement.body)) {
+      throw createTypeError(
+        `Function '${statement.identifier.name}' must return a value of type '${statement.returnType}'`,
+        statement.identifier.location
+      );
+    }
+  }
+
   private analyzeIdentifier(expression: Identifier): SemanticType {
     return this.scope.lookup(expression.name, expression.location).type;
   }
@@ -384,6 +432,32 @@ export class SemanticAnalyzer {
 
   private analyzeNumberLiteral(expression: NumberLiteral): SemanticType {
     return expression.numberType;
+  }
+
+  private analyzeReturnStatement(statement: ReturnStatement): void {
+    if (this.currentReturnType === undefined) {
+      throw createSyntaxError("'return' can only be used inside functions");
+    }
+
+    if (statement.value === undefined) {
+      if (this.currentReturnType !== 'void') {
+        throw createTypeError(`Cannot return void from function returning '${this.currentReturnType}'`);
+      }
+
+      return;
+    }
+
+    if (this.currentReturnType === 'void') {
+      throw createTypeError('Cannot return a value from function returning void');
+    }
+
+    const type = this.analyzeExpression(statement.value);
+
+    if (!areTypesCompatible(this.currentReturnType, type)) {
+      throw createTypeError(
+        `Cannot return value of type '${type}' from function returning '${this.currentReturnType}'`
+      );
+    }
   }
 
   private analyzeStatement(statement: Statement): void {
@@ -399,6 +473,12 @@ export class SemanticAnalyzer {
         return;
       case 'ForStatement':
         this.analyzeForStatement(statement);
+        return;
+      case 'FunctionDeclaration':
+        this.analyzeFunctionDeclaration(statement);
+        return;
+      case 'ReturnStatement':
+        this.analyzeReturnStatement(statement);
         return;
       case 'VariableDeclaration':
         this.analyzeVariableDeclaration(statement);
@@ -425,6 +505,10 @@ export class SemanticAnalyzer {
 
   private analyzeVariableDeclaration(statement: VariableDeclaration): void {
     const type = this.analyzeExpression(statement.initializer);
+
+    if (type === 'void') {
+      throw createTypeError(`Cannot initialize binding '${statement.identifier.name}' with void value`);
+    }
 
     if (!areTypesCompatible(statement.typeAnnotation, type)) {
       throw createTypeError(
@@ -456,6 +540,25 @@ export class SemanticAnalyzer {
         this.analyzeStatement(bodyStatement);
       }
     });
+  }
+
+  private hasReturnStatement(statements: Statement[]): boolean {
+    for (const statement of statements) {
+      if (statement.kind === 'ReturnStatement') {
+        return true;
+      }
+
+      if (
+        (statement.kind === 'DoWhileStatement' ||
+          statement.kind === 'ForStatement' ||
+          statement.kind === 'WhileStatement') &&
+        this.hasReturnStatement(statement.body)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private withScope(callback: () => void): void {

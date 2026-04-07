@@ -10,10 +10,13 @@ import type {
   Expression,
   ExpressionStatement,
   ForStatement,
+  FunctionReturnType,
+  FunctionDeclaration,
   Identifier,
   NullLiteral,
   NumberLiteral,
   Program,
+  ReturnStatement,
   Statement,
   StringLiteral,
   TypeName,
@@ -99,6 +102,14 @@ export class Parser {
       column: token.column,
       line: token.line,
     });
+  }
+
+  private getFunctionReturnType(token: Token): FunctionReturnType {
+    if (token.lexeme === 'void') {
+      return 'void';
+    }
+
+    return this.getTypeName(token);
   }
 
   private getTypeName(token: Token): TypeName {
@@ -338,6 +349,21 @@ export class Parser {
     return forStatement;
   }
 
+  private parseFunctionDeclaration(): FunctionDeclaration {
+    const name = this.consume(TokenType.Identifier, "Expected function name after 'function'.");
+    this.consume(TokenType.LeftParen, "Expected '(' after function name.");
+    this.consume(TokenType.RightParen, "Expected ')' after function parameters.");
+    this.consume(TokenType.Colon, "Expected ':' after function parameters.");
+    const returnType = this.consume(TokenType.Identifier, "Expected return type after ':'.");
+
+    return {
+      body: this.parseBlockStatement(),
+      identifier: this.createIdentifier(name),
+      kind: 'FunctionDeclaration',
+      returnType: this.getFunctionReturnType(returnType),
+    };
+  }
+
   private parseLogicalAnd(): Expression {
     let expression = this.parseEquality();
 
@@ -431,6 +457,22 @@ export class Parser {
     throw this.error(this.peek(), 'Expected expression.');
   }
 
+  private parseReturnStatement(): ReturnStatement {
+    if (this.match(TokenType.Semicolon)) {
+      return {
+        kind: 'ReturnStatement',
+      };
+    }
+
+    const value = this.parseExpression();
+    this.consume(TokenType.Semicolon, "Expected ';' after return value.");
+
+    return {
+      kind: 'ReturnStatement',
+      value,
+    };
+  }
+
   private parseStatement(): Statement {
     if (this.match(TokenType.Var)) {
       return this.parseVariableDeclaration('var');
@@ -446,6 +488,14 @@ export class Parser {
 
     if (this.match(TokenType.Do)) {
       return this.parseDoWhileStatement();
+    }
+
+    if (this.match(TokenType.Function)) {
+      return this.parseFunctionDeclaration();
+    }
+
+    if (this.match(TokenType.Return)) {
+      return this.parseReturnStatement();
     }
 
     if (this.match(TokenType.While)) {

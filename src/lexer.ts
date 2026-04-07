@@ -5,8 +5,10 @@ import { Char } from './utils/char';
 const KEYWORDS: Record<string, TokenType> = {
   do: TokenType.Do,
   for: TokenType.For,
+  function: TokenType.Function,
   null: TokenType.Null,
   of: TokenType.Of,
+  return: TokenType.Return,
   val: TokenType.Val,
   var: TokenType.Var,
   while: TokenType.While,

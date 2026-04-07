@@ -9,10 +9,13 @@ import type {
   DoWhileStatement,
   Expression,
   ForStatement,
+  FunctionReturnType,
+  FunctionDeclaration,
   Identifier,
   NumberLiteral,
   NumberLiteralType,
   Program,
+  ReturnStatement,
   Statement,
   StringLiteral,
   TypeName,
@@ -55,12 +58,31 @@ export type NumberValue = {
   value: number;
 };
 
-export type RuntimeValue = ArrayValue | BooleanValue | NativeFunctionValue | NullValue | NumberValue | StringValue;
-
 export type StringValue = {
   type: 'string';
   value: string;
 };
+
+export type UserFunctionValue = {
+  body: Statement[];
+  closure: Scope;
+  name: string;
+  returnType: FunctionReturnType;
+  type: 'function';
+};
+
+export type RuntimeValue =
+  | ArrayValue
+  | BooleanValue
+  | NativeFunctionValue
+  | NullValue
+  | NumberValue
+  | StringValue
+  | UserFunctionValue;
+
+class ReturnSignal {
+  public constructor(public readonly value: RuntimeValue) {}
+}
 
 function promoteNumberType(
   operator: BinaryOperator,
@@ -93,6 +115,8 @@ function areRuntimeValuesEqual(left: RuntimeValue, right: RuntimeValue): boolean
     case 'boolean':
       return right.type === 'boolean' && left.value === right.value;
     case 'native-function':
+      return left === right;
+    case 'function':
       return left === right;
     case 'null':
       return true;
@@ -256,6 +280,26 @@ export class Interpreter {
     return lastValue;
   }
 
+  private callUserFunction(callee: UserFunctionValue): RuntimeValue {
+    try {
+      return this.withScopeFrom(callee.closure, () => {
+        let lastValue: RuntimeValue = { type: 'null', value: null };
+
+        for (const bodyStatement of callee.body) {
+          lastValue = this.executeStatement(bodyStatement);
+        }
+
+        return lastValue;
+      });
+    } catch (error) {
+      if (error instanceof ReturnSignal) {
+        return error.value;
+      }
+
+      throw error;
+    }
+  }
+
   private evaluateArrayLiteral(expression: ArrayLiteral): RuntimeValue {
     return {
       elements: expression.elements.map((element) => this.evaluateExpression(element)),
@@ -403,12 +447,21 @@ export class Interpreter {
   private evaluateCallExpression(expression: CallExpression): RuntimeValue {
     const callee = this.scope.lookup(expression.callee.name);
 
-    if (callee.type !== 'native-function') {
-      throw createTypeError(`Binding '${expression.callee.name}' is not callable`);
+    const args = expression.arguments.map((arg) => this.evaluateExpression(arg));
+
+    if (callee.type === 'native-function') {
+      return callee.call(args);
     }
 
-    const args = expression.arguments.map((arg) => this.evaluateExpression(arg));
-    return callee.call(args);
+    if (callee.type === 'function') {
+      if (args.length !== 0) {
+        throw createTypeError(`Function '${callee.name}' expects 0 arguments, got ${args.length}`);
+      }
+
+      return this.callUserFunction(callee);
+    }
+
+    throw createTypeError(`Binding '${expression.callee.name}' is not callable`);
   }
 
   private evaluateConditionalExpression(expression: ConditionalExpression): RuntimeValue {
@@ -545,6 +598,29 @@ export class Interpreter {
     return lastValue;
   }
 
+  private executeFunctionDeclaration(statement: FunctionDeclaration): RuntimeValue {
+    return this.scope.define(
+      statement.identifier.name,
+      {
+        body: statement.body,
+        closure: this.scope,
+        name: statement.identifier.name,
+        returnType: statement.returnType,
+        type: 'function',
+      },
+      false
+    );
+  }
+
+  private executeReturnStatement(statement: ReturnStatement): RuntimeValue {
+    const value =
+      statement.value === undefined
+        ? ({ type: 'null', value: null } satisfies NullValue)
+        : this.evaluateExpression(statement.value);
+
+    throw new ReturnSignal(value);
+  }
+
   private executeStatement(statement: Statement): RuntimeValue {
     switch (statement.kind) {
       case 'AssignmentStatement':
@@ -555,6 +631,10 @@ export class Interpreter {
         return this.evaluateExpression(statement.expression);
       case 'ForStatement':
         return this.executeForStatement(statement);
+      case 'FunctionDeclaration':
+        return this.executeFunctionDeclaration(statement);
+      case 'ReturnStatement':
+        return this.executeReturnStatement(statement);
       case 'VariableDeclaration':
         return this.executeVariableDeclaration(statement);
       case 'WhileStatement':
@@ -609,6 +689,8 @@ export class Interpreter {
         return String(value.value);
       case 'native-function':
         return `<native function ${value.name}>`;
+      case 'function':
+        return `<function ${value.name}>`;
       case 'null':
         return 'null';
       case 'number':
@@ -620,7 +702,12 @@ export class Interpreter {
 
   private withScope(callback: () => RuntimeValue): RuntimeValue {
     const previousScope = this.scope;
-    this.scope = new Scope(previousScope);
+    return this.withScopeFrom(previousScope, callback);
+  }
+
+  private withScopeFrom(parent: Scope, callback: () => RuntimeValue): RuntimeValue {
+    const previousScope = this.scope;
+    this.scope = new Scope(parent);
 
     try {
       return callback();

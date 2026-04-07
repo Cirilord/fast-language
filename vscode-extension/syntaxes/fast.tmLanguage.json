@@ -50,7 +50,7 @@
         },
         {
           "name": "keyword.control.fast",
-          "match": "\\b(?:do|for|of|while)\\b"
+          "match": "\\b(?:do|for|function|of|return|while)\\b"
         },
         {
           "name": "constant.language.null.fast",
@@ -58,7 +58,7 @@
         },
         {
           "name": "support.type.fast",
-          "match": "\\b(?:array|boolean|double|float|int|string)\\b"
+          "match": "\\b(?:array|boolean|double|float|int|string|void)\\b"
         }
       ]
     },
