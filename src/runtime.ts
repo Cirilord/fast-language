@@ -5,6 +5,7 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  ConditionalExpression,
   DoWhileStatement,
   Expression,
   ForStatement,
@@ -410,6 +411,16 @@ export class Interpreter {
     return callee.call(args);
   }
 
+  private evaluateConditionalExpression(expression: ConditionalExpression): RuntimeValue {
+    const test = this.evaluateExpression(expression.test);
+
+    if (test.type !== 'boolean') {
+      throw createTypeError('Ternary condition must be a boolean');
+    }
+
+    return this.evaluateExpression(test.value ? expression.consequent : expression.alternate);
+  }
+
   private evaluateExpression(expression: Expression): RuntimeValue {
     switch (expression.kind) {
       case 'ArrayLiteral':
@@ -418,6 +429,8 @@ export class Interpreter {
         return this.evaluateBinaryExpression(expression);
       case 'CallExpression':
         return this.evaluateCallExpression(expression);
+      case 'ConditionalExpression':
+        return this.evaluateConditionalExpression(expression);
       case 'Identifier':
         return this.evaluateIdentifier(expression);
       case 'NumberLiteral':

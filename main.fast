@@ -19,6 +19,7 @@ var shouldFallback: boolean = 5 > 10;
 val canPrint: boolean = shouldPrint && shouldFallback;
 val canFallback: boolean = shouldPrint || shouldFallback;
 val fallbackText: string = nullableText ?? "Default text";
+val status: string = canFallback ? "enabled" : "disabled";
 
 x += 5;
 x -= 2;
@@ -63,3 +64,4 @@ print(shouldFallback);
 print(canPrint);
 print(canFallback);
 print(fallbackText);
+print(status);

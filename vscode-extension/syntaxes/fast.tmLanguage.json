@@ -89,6 +89,10 @@
           "match": "(?:&&|\\|\\||\\?\\?)"
         },
         {
+          "name": "keyword.operator.ternary.fast",
+          "match": "\\?"
+        },
+        {
           "name": "keyword.operator.arithmetic.fast",
           "match": "[+\\-*/%]"
         }

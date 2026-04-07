@@ -206,10 +206,8 @@ export class Lexer {
           continue;
         }
 
-        throw createSyntaxError("Unexpected character '?'. Did you mean '??' or '??='?", {
-          column: startColumn,
-          line: this.line,
-        });
+        tokens.push(this.makeToken(TokenType.Question, char, startColumn));
+        continue;
       }
 
       if (Char.isLeftBracket(char)) {

@@ -28,6 +28,7 @@ export enum TokenType {
   PipePipeEquals = 'PIPE_PIPE_EQUALS',
   Plus = 'PLUS',
   PlusEquals = 'PLUS_EQUALS',
+  Question = 'QUESTION',
   QuestionQuestion = 'QUESTION_QUESTION',
   QuestionQuestionEquals = 'QUESTION_QUESTION_EQUALS',
   RightBrace = 'RIGHT_BRACE',

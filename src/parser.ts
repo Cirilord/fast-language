@@ -5,6 +5,7 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  ConditionalExpression,
   DoWhileStatement,
   Expression,
   ExpressionStatement,
@@ -236,6 +237,25 @@ export class Parser {
     return expression;
   }
 
+  private parseConditionalExpression(): Expression {
+    const test = this.parseNullishCoalescing();
+
+    if (!this.match(TokenType.Question)) {
+      return test;
+    }
+
+    const consequent = this.parseExpression();
+    this.consume(TokenType.Colon, "Expected ':' after ternary consequent.");
+    const alternate = this.parseExpression();
+
+    return {
+      alternate,
+      consequent,
+      kind: 'ConditionalExpression',
+      test,
+    } satisfies ConditionalExpression;
+  }
+
   private parseDoWhileStatement(): DoWhileStatement {
     const body = this.parseBlockStatement();
 
@@ -271,7 +291,7 @@ export class Parser {
   }
 
   private parseExpression(): Expression {
-    return this.parseNullishCoalescing();
+    return this.parseConditionalExpression();
   }
 
   private parseFactor(): Expression {

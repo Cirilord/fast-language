@@ -21,6 +21,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Comparison operators `>`, `>=`, `<`, `<=`, `==`, and `!=` return booleans.
 - Logical operators `&&` and `||` expect boolean operands and short-circuit.
 - Nullish coalescing `??` returns the right value only when the left value is `null`.
+- Ternary expressions use `condition ? value : value`, require a boolean condition, and require compatible branch types.
 - Compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands.
 - Logical assignment operators `&&=` and `||=` expect boolean operands.
 - Nullish assignment `??=` assigns only when the current value is `null`.

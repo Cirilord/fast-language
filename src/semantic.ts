@@ -5,6 +5,7 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  ConditionalExpression,
   DoWhileStatement,
   Expression,
   ExpressionStatement,
@@ -275,6 +276,27 @@ export class SemanticAnalyzer {
     return 'unknown';
   }
 
+  private analyzeConditionalExpression(expression: ConditionalExpression): SemanticType {
+    const testType = this.analyzeExpression(expression.test);
+
+    if (testType !== 'boolean' && testType !== 'unknown') {
+      throw createTypeError(`Ternary condition must be a boolean, got '${testType}'`);
+    }
+
+    const consequentType = this.analyzeExpression(expression.consequent);
+    const alternateType = this.analyzeExpression(expression.alternate);
+
+    if (areTypesCompatible(consequentType, alternateType)) {
+      return consequentType;
+    }
+
+    if (areTypesCompatible(alternateType, consequentType)) {
+      return alternateType;
+    }
+
+    throw createTypeError('Ternary branches must have compatible types');
+  }
+
   private analyzeDoWhileStatement(statement: DoWhileStatement): void {
     this.withScope(() => {
       for (const bodyStatement of statement.body) {
@@ -297,6 +319,8 @@ export class SemanticAnalyzer {
         return this.analyzeBinaryExpression(expression);
       case 'CallExpression':
         return this.analyzeCallExpression(expression);
+      case 'ConditionalExpression':
+        return this.analyzeConditionalExpression(expression);
       case 'Identifier':
         return this.analyzeIdentifier(expression);
       case 'NumberLiteral':

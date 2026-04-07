@@ -10,6 +10,7 @@ Right now the project is implemented in TypeScript and already supports:
 - arithmetic expressions with `+`, `-`, `*`, `/`, `%`, unary `-`, and grouped expressions with `(...)`
 - comparison expressions with `>`, `>=`, `<`, `<=`, `==`, and `!=`
 - logical expressions with `&&`, `||`, and `??`
+- ternary expressions with `condition ? value : value`
 - compound assignment operators with `+=`, `-=`, `*=`, `/=`, and `%=`
 - logical assignment operators with `&&=`, `||=`, and `??=`
 - typed numeric declarations like `var count: int = 10;`
@@ -50,6 +51,7 @@ var shouldFallback: boolean = 5 > 10;
 val canPrint: boolean = shouldPrint && shouldFallback;
 val canFallback: boolean = shouldPrint || shouldFallback;
 val fallbackText: string = nullableText ?? "Default text";
+val status: string = canFallback ? "enabled" : "disabled";
 
 x += 5;
 x -= 2;
@@ -90,6 +92,7 @@ print(shouldFallback);
 print(canPrint);
 print(canFallback);
 print(fallbackText);
+print(status);
 ```
 
 ## Project Flow
@@ -145,6 +148,7 @@ Then open a `.fast` file in the extension development window.
 - compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands
 - logical operators `&&` and `||` expect boolean operands and short-circuit
 - nullish coalescing `??` returns the right value only when the left value is `null`
+- ternary expressions use `condition ? value : value`, require a boolean condition, and require compatible branch types
 - logical assignment operators `&&=` and `||=` expect boolean operands
 - nullish assignment `??=` assigns only when the current value is `null`
 - comparison operators `>`, `>=`, `<`, and `<=` expect number operands and return booleans

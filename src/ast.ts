@@ -66,6 +66,7 @@ export type Expression =
   | ArrayLiteral
   | BinaryExpression
   | CallExpression
+  | ConditionalExpression
   | Identifier
   | NullLiteral
   | NumberLiteral
@@ -82,6 +83,13 @@ export type BinaryExpression = {
   left: Expression;
   operator: BinaryOperator;
   right: Expression;
+};
+
+export type ConditionalExpression = {
+  alternate: Expression;
+  consequent: Expression;
+  kind: 'ConditionalExpression';
+  test: Expression;
 };
 
 export type Identifier = {
