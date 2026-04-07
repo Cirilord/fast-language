@@ -1,6 +1,7 @@
 import type {
   ArrayLiteral,
   AssignmentStatement,
+  BinaryExpression,
   CallExpression,
   Expression,
   ForStatement,
@@ -127,6 +128,26 @@ export class Interpreter {
     };
   }
 
+  private evaluateBinaryExpression(expression: BinaryExpression): RuntimeValue {
+    const left = this.evaluateExpression(expression.left);
+    const right = this.evaluateExpression(expression.right);
+
+    if (left.type !== 'number' || right.type !== 'number') {
+      throw createTypeError(`Operator '${expression.operator}' expects number operands`);
+    }
+
+    switch (expression.operator) {
+      case '+':
+        return { type: 'number', value: left.value + right.value };
+      case '-':
+        return { type: 'number', value: left.value - right.value };
+      case '*':
+        return { type: 'number', value: left.value * right.value };
+      case '/':
+        return { type: 'number', value: left.value / right.value };
+    }
+  }
+
   private evaluateCallExpression(expression: CallExpression): RuntimeValue {
     const callee = this.scope.lookup(expression.callee.name);
 
@@ -142,6 +163,8 @@ export class Interpreter {
     switch (expression.kind) {
       case 'ArrayLiteral':
         return this.evaluateArrayLiteral(expression);
+      case 'BinaryExpression':
+        return this.evaluateBinaryExpression(expression);
       case 'CallExpression':
         return this.evaluateCallExpression(expression);
       case 'Identifier':

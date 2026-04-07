@@ -1,6 +1,7 @@
 import type {
   ArrayLiteral,
   AssignmentStatement,
+  BinaryExpression,
   CallExpression,
   Expression,
   ExpressionStatement,
@@ -95,6 +96,17 @@ export class SemanticAnalyzer {
     this.scope.assign(statement.identifier.name, type, statement.identifier.location);
   }
 
+  private analyzeBinaryExpression(expression: BinaryExpression): SemanticType {
+    const leftType = this.analyzeExpression(expression.left);
+    const rightType = this.analyzeExpression(expression.right);
+
+    if (leftType !== 'number' || rightType !== 'number') {
+      throw createTypeError(`Operator '${expression.operator}' expects number operands`);
+    }
+
+    return 'number';
+  }
+
   private analyzeCallExpression(expression: CallExpression): SemanticType {
     const callee = this.scope.lookup(expression.callee.name, expression.callee.location);
 
@@ -113,6 +125,8 @@ export class SemanticAnalyzer {
     switch (expression.kind) {
       case 'ArrayLiteral':
         return this.analyzeArrayLiteral(expression);
+      case 'BinaryExpression':
+        return this.analyzeBinaryExpression(expression);
       case 'CallExpression':
         return this.analyzeCallExpression(expression);
       case 'Identifier':

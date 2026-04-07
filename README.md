@@ -7,6 +7,7 @@ Right now the project is implemented in TypeScript and already supports:
 - variable declarations with `var`
 - constant declarations with `val`
 - reassignment for `var`
+- arithmetic expressions with `+`, `-`, `*`, `/`, and grouped expressions with `(...)`
 - number literals
 - string literals with `"`
 - multiline strings with `` ` ``
@@ -21,11 +22,14 @@ Right now the project is implemented in TypeScript and already supports:
 
 ```fast
 val items = ["first", "second", "third"];
+val result = (10 + 5) * 2;
 
 for (var item, index of items) {
   print(index);
   print(item);
 }
+
+print(result);
 ```
 
 ## Project Flow
@@ -64,6 +68,8 @@ yarn format
 - `var` creates mutable bindings
 - `val` creates immutable bindings
 - only `var` can be reassigned
+- arithmetic operators currently expect number operands
+- parentheses can be used to group arithmetic expressions
 - normal strings must use `"`
 - multiline strings must use `` ` ``
 - arrays use `[value, value]`
@@ -76,7 +82,6 @@ yarn format
 
 Possible next milestones:
 
-- arithmetic expressions
 - multiple function arguments
 - nested scopes
 - user-defined functions

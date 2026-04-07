@@ -36,11 +36,20 @@ export type ExpressionStatement = {
   kind: 'ExpressionStatement';
 };
 
-export type Expression = ArrayLiteral | CallExpression | Identifier | NumberLiteral | StringLiteral;
+export type BinaryOperator = '+' | '-' | '*' | '/';
+
+export type Expression = ArrayLiteral | BinaryExpression | CallExpression | Identifier | NumberLiteral | StringLiteral;
 
 export type ArrayLiteral = {
   elements: Expression[];
   kind: 'ArrayLiteral';
+};
+
+export type BinaryExpression = {
+  kind: 'BinaryExpression';
+  left: Expression;
+  operator: BinaryOperator;
+  right: Expression;
 };
 
 export type Identifier = {

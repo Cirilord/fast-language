@@ -1,6 +1,7 @@
 var a = 30;
 val b = "Test";
 val items = ["first", "second", "third"];
+val result = (10 + 5) * 2;
 
 for (var item, index of items) {
   print(index);
@@ -11,3 +12,4 @@ a = 50;
 
 print(a);
 print(b);
+print(result);

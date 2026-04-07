@@ -1,6 +1,8 @@
 import type {
   ArrayLiteral,
   AssignmentStatement,
+  BinaryExpression,
+  BinaryOperator,
   CallExpression,
   Expression,
   ExpressionStatement,
@@ -165,7 +167,25 @@ export class Parser {
   }
 
   private parseExpression(): Expression {
-    return this.parseCallExpression();
+    return this.parseTerm();
+  }
+
+  private parseFactor(): Expression {
+    let expression = this.parseCallExpression();
+
+    while (this.match(TokenType.Star, TokenType.Slash)) {
+      const operator = this.previous().lexeme as BinaryOperator;
+      const right = this.parseCallExpression();
+
+      expression = {
+        kind: 'BinaryExpression',
+        left: expression,
+        operator,
+        right,
+      } satisfies BinaryExpression;
+    }
+
+    return expression;
   }
 
   private parseForStatement(): ForStatement {
@@ -195,6 +215,12 @@ export class Parser {
   }
 
   private parsePrimary(): Expression {
+    if (this.match(TokenType.LeftParen)) {
+      const expression = this.parseExpression();
+      this.consume(TokenType.RightParen, "Expected ')' after grouped expression.");
+      return expression;
+    }
+
     if (this.match(TokenType.LeftBracket)) {
       return this.parseArrayLiteral();
     }
@@ -244,6 +270,24 @@ export class Parser {
       expression,
       kind: 'ExpressionStatement',
     } satisfies ExpressionStatement;
+  }
+
+  private parseTerm(): Expression {
+    let expression = this.parseFactor();
+
+    while (this.match(TokenType.Plus, TokenType.Minus)) {
+      const operator = this.previous().lexeme as BinaryOperator;
+      const right = this.parseFactor();
+
+      expression = {
+        kind: 'BinaryExpression',
+        left: expression,
+        operator,
+        right,
+      } satisfies BinaryExpression;
+    }
+
+    return expression;
   }
 
   private parseVariableDeclaration(declarationType: 'var' | 'val'): VariableDeclaration {

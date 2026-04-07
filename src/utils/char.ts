@@ -43,6 +43,14 @@ export class Char {
     return char === '(';
   }
 
+  public static isMinus(char: string): boolean {
+    return char === '-';
+  }
+
+  public static isPlus(char: string): boolean {
+    return char === '+';
+  }
+
   public static isRightBrace(char: string): boolean {
     return char === '}';
   }
@@ -57,6 +65,14 @@ export class Char {
 
   public static isSemicolon(char: string): boolean {
     return char === ';';
+  }
+
+  public static isSlash(char: string): boolean {
+    return char === '/';
+  }
+
+  public static isStar(char: string): boolean {
+    return char === '*';
   }
 
   public static isWhitespace(char: string): boolean {

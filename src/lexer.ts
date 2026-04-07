@@ -37,6 +37,26 @@ export class Lexer {
         continue;
       }
 
+      if (Char.isPlus(char)) {
+        tokens.push(this.makeToken(TokenType.Plus, char, startColumn));
+        continue;
+      }
+
+      if (Char.isMinus(char)) {
+        tokens.push(this.makeToken(TokenType.Minus, char, startColumn));
+        continue;
+      }
+
+      if (Char.isStar(char)) {
+        tokens.push(this.makeToken(TokenType.Star, char, startColumn));
+        continue;
+      }
+
+      if (Char.isSlash(char)) {
+        tokens.push(this.makeToken(TokenType.Slash, char, startColumn));
+        continue;
+      }
+
       if (Char.isComma(char)) {
         tokens.push(this.makeToken(TokenType.Comma, char, startColumn));
         continue;
