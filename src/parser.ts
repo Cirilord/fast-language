@@ -1,5 +1,6 @@
 import type {
   ArrayLiteral,
+  AssignmentOperator,
   AssignmentStatement,
   BinaryExpression,
   BinaryOperator,
@@ -54,17 +55,20 @@ export class Parser {
     return this.peek().type === type;
   }
 
-  private checkNext(type: TokenType): boolean {
-    const token = this.tokens[this.current + 1];
-    return token?.type === type;
-  }
-
   private consume(type: TokenType, message: string): Token {
     if (this.check(type)) {
       return this.advance();
     }
 
     throw this.error(this.peek(), message);
+  }
+
+  private consumeAssignmentOperator(): Token {
+    if (this.isAssignmentOperatorToken(this.peek().type)) {
+      return this.advance();
+    }
+
+    throw this.error(this.peek(), 'Expected assignment operator.');
   }
 
   private createIdentifier(token: Token): Identifier {
@@ -110,6 +114,17 @@ export class Parser {
     }
   }
 
+  private isAssignmentOperatorToken(type: TokenType): boolean {
+    return (
+      type === TokenType.Equals ||
+      type === TokenType.PlusEquals ||
+      type === TokenType.MinusEquals ||
+      type === TokenType.StarEquals ||
+      type === TokenType.SlashEquals ||
+      type === TokenType.PercentEquals
+    );
+  }
+
   private isAtEnd(): boolean {
     return this.peek().type === TokenType.EOF;
   }
@@ -144,14 +159,15 @@ export class Parser {
 
   private parseAssignmentStatement(): AssignmentStatement {
     const identifier = this.consume(TokenType.Identifier, 'Expected identifier before assignment.');
+    const operator = this.consumeAssignmentOperator();
 
-    this.consume(TokenType.Equals, "Expected '=' in assignment.");
     const value = this.parseExpression();
     this.consume(TokenType.Semicolon, "Expected ';' after assignment.");
 
     return {
       identifier: this.createIdentifier(identifier),
       kind: 'AssignmentStatement',
+      operator: operator.lexeme as AssignmentOperator,
       value,
     };
   }
@@ -284,7 +300,7 @@ export class Parser {
       return this.parseForStatement();
     }
 
-    if (this.check(TokenType.Identifier) && this.checkNext(TokenType.Equals)) {
+    if (this.check(TokenType.Identifier) && this.isAssignmentOperatorToken(this.peekNext().type)) {
       return this.parseAssignmentStatement();
     }
 
@@ -352,6 +368,10 @@ export class Parser {
     }
 
     return token;
+  }
+
+  private peekNext(): Token {
+    return this.tokens[this.current + 1] ?? this.peek();
   }
 
   private previous(): Token {

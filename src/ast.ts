@@ -13,6 +13,7 @@ export type SourceLocation = {
 export type AssignmentStatement = {
   identifier: Identifier;
   kind: 'AssignmentStatement';
+  operator: AssignmentOperator;
   value: Expression;
 };
 
@@ -37,6 +38,8 @@ export type ExpressionStatement = {
 };
 
 export type BinaryOperator = '%' | '*' | '+' | '-' | '/';
+
+export type AssignmentOperator = '%=' | '*=' | '+=' | '-=' | '/=' | '=';
 
 export type UnaryOperator = '-';
 

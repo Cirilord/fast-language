@@ -39,21 +39,45 @@ export class Lexer {
       }
 
       if (Char.isPlus(char)) {
+        if (Char.isEquals(this.peek())) {
+          this.advance();
+          tokens.push(this.makeToken(TokenType.PlusEquals, '+=', startColumn));
+          continue;
+        }
+
         tokens.push(this.makeToken(TokenType.Plus, char, startColumn));
         continue;
       }
 
       if (Char.isMinus(char)) {
+        if (Char.isEquals(this.peek())) {
+          this.advance();
+          tokens.push(this.makeToken(TokenType.MinusEquals, '-=', startColumn));
+          continue;
+        }
+
         tokens.push(this.makeToken(TokenType.Minus, char, startColumn));
         continue;
       }
 
       if (Char.isPercent(char)) {
+        if (Char.isEquals(this.peek())) {
+          this.advance();
+          tokens.push(this.makeToken(TokenType.PercentEquals, '%=', startColumn));
+          continue;
+        }
+
         tokens.push(this.makeToken(TokenType.Percent, char, startColumn));
         continue;
       }
 
       if (Char.isStar(char)) {
+        if (Char.isEquals(this.peek())) {
+          this.advance();
+          tokens.push(this.makeToken(TokenType.StarEquals, '*=', startColumn));
+          continue;
+        }
+
         tokens.push(this.makeToken(TokenType.Star, char, startColumn));
         continue;
       }
@@ -61,6 +85,12 @@ export class Lexer {
       if (Char.isSlash(char)) {
         if (Char.isSlash(this.peek())) {
           this.skipLineComment();
+          continue;
+        }
+
+        if (Char.isEquals(this.peek())) {
+          this.advance();
+          tokens.push(this.makeToken(TokenType.SlashEquals, '/=', startColumn));
           continue;
         }
 

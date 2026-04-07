@@ -18,6 +18,7 @@ This file tracks working conventions for the `fast` language project so future c
 - `val` is immutable.
 - only `var` can be reassigned.
 - Arithmetic operators currently expect number operands, including `%` for modulo.
+- Compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands.
 - Parentheses can group arithmetic expressions.
 - Unary `-` can be used with numbers and grouped numeric expressions.
 - Number literals must include a type suffix: `i` for integer, `f` for float, or `d` for double.

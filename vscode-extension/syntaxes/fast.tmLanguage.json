@@ -74,7 +74,7 @@
       "patterns": [
         {
           "name": "keyword.operator.assignment.fast",
-          "match": "="
+          "match": "(?:\\+=|-=|\\*=|/=|%=|=)"
         },
         {
           "name": "keyword.operator.arithmetic.fast",

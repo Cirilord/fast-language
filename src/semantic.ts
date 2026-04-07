@@ -1,5 +1,6 @@
 import type {
   ArrayLiteral,
+  AssignmentOperator,
   AssignmentStatement,
   BinaryExpression,
   BinaryOperator,
@@ -48,6 +49,23 @@ function promoteNumericType(
   }
 
   return 'int';
+}
+
+function toBinaryOperator(operator: AssignmentOperator): BinaryOperator {
+  switch (operator) {
+    case '%=':
+      return '%';
+    case '*=':
+      return '*';
+    case '+=':
+      return '+';
+    case '-=':
+      return '-';
+    case '/=':
+      return '/';
+    case '=':
+      throw createTypeError("Simple assignment operator '=' cannot be converted to a binary operator");
+  }
 }
 
 class SemanticScope {
@@ -121,7 +139,27 @@ export class SemanticAnalyzer {
 
   private analyzeAssignmentStatement(statement: AssignmentStatement): void {
     const type = this.analyzeExpression(statement.value);
-    this.scope.assign(statement.identifier.name, type, statement.identifier.location);
+
+    if (statement.operator === '=') {
+      this.scope.assign(statement.identifier.name, type, statement.identifier.location);
+      return;
+    }
+
+    const symbol = this.scope.lookup(statement.identifier.name, statement.identifier.location);
+
+    if (!symbol.mutable) {
+      throw createTypeError(
+        `Cannot reassign immutable binding '${statement.identifier.name}'`,
+        statement.identifier.location
+      );
+    }
+
+    if (!isNumericType(symbol.type) || !isNumericType(type)) {
+      throw createTypeError(`Operator '${statement.operator}' expects number operands`, statement.identifier.location);
+    }
+
+    const assignedType = promoteNumericType(toBinaryOperator(statement.operator), symbol.type, type);
+    this.scope.assign(statement.identifier.name, assignedType, statement.identifier.location);
   }
 
   private analyzeBinaryExpression(expression: BinaryExpression): SemanticType {

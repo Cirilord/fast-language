@@ -1,5 +1,6 @@
 import type {
   ArrayLiteral,
+  AssignmentOperator,
   AssignmentStatement,
   BinaryExpression,
   BinaryOperator,
@@ -71,6 +72,23 @@ function promoteNumberType(
   return 'int';
 }
 
+function toBinaryOperator(operator: AssignmentOperator): BinaryOperator {
+  switch (operator) {
+    case '%=':
+      return '%';
+    case '*=':
+      return '*';
+    case '+=':
+      return '+';
+    case '-=':
+      return '-';
+    case '/=':
+      return '/';
+    case '=':
+      throw createTypeError("Simple assignment operator '=' cannot be converted to a binary operator");
+  }
+}
+
 class Scope {
   private readonly bindings = new Map<string, Binding>();
 
@@ -115,6 +133,30 @@ class Scope {
   }
 }
 
+function evaluateCompoundAssignment(
+  current: NumberValue,
+  operator: AssignmentOperator,
+  value: NumberValue
+): NumberValue {
+  const binaryOperator = toBinaryOperator(operator);
+  const numberType = promoteNumberType(binaryOperator, current.numberType, value.numberType);
+
+  switch (operator) {
+    case '%=':
+      return { numberType, type: 'number', value: current.value % value.value };
+    case '*=':
+      return { numberType, type: 'number', value: current.value * value.value };
+    case '+=':
+      return { numberType, type: 'number', value: current.value + value.value };
+    case '-=':
+      return { numberType, type: 'number', value: current.value - value.value };
+    case '/=':
+      return { numberType, type: 'number', value: current.value / value.value };
+    case '=':
+      throw createTypeError("Simple assignment operator '=' cannot be evaluated as compound assignment");
+  }
+}
+
 export class Interpreter {
   private scope = new Scope();
 
@@ -150,6 +192,22 @@ export class Interpreter {
       elements: expression.elements.map((element) => this.evaluateExpression(element)),
       type: 'array',
     };
+  }
+
+  private evaluateAssignmentValue(statement: AssignmentStatement): RuntimeValue {
+    const value = this.evaluateExpression(statement.value);
+
+    if (statement.operator === '=') {
+      return value;
+    }
+
+    const current = this.scope.lookup(statement.identifier.name);
+
+    if (current.type !== 'number' || value.type !== 'number') {
+      throw createTypeError(`Operator '${statement.operator}' expects number operands`);
+    }
+
+    return evaluateCompoundAssignment(current, statement.operator, value);
   }
 
   private evaluateBinaryExpression(expression: BinaryExpression): RuntimeValue {
@@ -258,7 +316,7 @@ export class Interpreter {
   }
 
   private executeAssignmentStatement(statement: AssignmentStatement): RuntimeValue {
-    const value = this.evaluateExpression(statement.value);
+    const value = this.evaluateAssignmentValue(statement);
     return this.scope.assign(statement.identifier.name, value);
   }
 
