@@ -1,4 +1,5 @@
 export enum TokenType {
+  As = 'AS',
   BangEqual = 'BANG_EQUAL',
   Comma = 'COMMA',
   EOF = 'EOF',
@@ -15,6 +16,7 @@ export enum TokenType {
   LessEquals = 'LESS_EQUALS',
   Minus = 'MINUS',
   MinusEquals = 'MINUS_EQUALS',
+  Null = 'NULL',
   Number = 'NUMBER',
   Of = 'OF',
   Percent = 'PERCENT',

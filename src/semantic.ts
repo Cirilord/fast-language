@@ -9,6 +9,7 @@ import type {
   ExpressionStatement,
   ForStatement,
   Identifier,
+  NullLiteral,
   NumberLiteral,
   NumberLiteralType,
   Program,
@@ -227,6 +228,8 @@ export class SemanticAnalyzer {
         return this.analyzeIdentifier(expression);
       case 'NumberLiteral':
         return this.analyzeNumberLiteral(expression);
+      case 'NullLiteral':
+        return this.analyzeNullLiteral(expression);
       case 'StringLiteral':
         return this.analyzeStringLiteral();
       case 'UnaryExpression':
@@ -276,6 +279,10 @@ export class SemanticAnalyzer {
 
   private analyzeIdentifier(expression: Identifier): SemanticType {
     return this.scope.lookup(expression.name, expression.location).type;
+  }
+
+  private analyzeNullLiteral(expression: NullLiteral): SemanticType {
+    return expression.nullType;
   }
 
   private analyzeNumberLiteral(expression: NumberLiteral): SemanticType {

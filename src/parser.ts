@@ -9,11 +9,13 @@ import type {
   ExpressionStatement,
   ForStatement,
   Identifier,
+  NullLiteral,
   NumberLiteral,
   NumberLiteralType,
   Program,
   Statement,
   StringLiteral,
+  TypeName,
   UnaryExpression,
   UnaryOperator,
   VariableDeclaration,
@@ -111,6 +113,25 @@ export class Parser {
         return 'float';
       case 'i':
         return 'int';
+    }
+  }
+
+  private getTypeName(token: Token): TypeName {
+    switch (token.lexeme) {
+      case 'array':
+        return 'array';
+      case 'boolean':
+        return 'boolean';
+      case 'double':
+        return 'double';
+      case 'float':
+        return 'float';
+      case 'int':
+        return 'int';
+      case 'string':
+        return 'string';
+      default:
+        throw this.error(token, 'Expected a valid type name.');
     }
   }
 
@@ -294,6 +315,16 @@ export class Parser {
     return forStatement;
   }
 
+  private parseNullLiteral(): NullLiteral {
+    this.consume(TokenType.As, "Expected 'as' after null literal.");
+    const type = this.consume(TokenType.Identifier, "Expected type name after 'as'.");
+
+    return {
+      kind: 'NullLiteral',
+      nullType: this.getTypeName(type),
+    };
+  }
+
   private parsePrimary(): Expression {
     if (this.match(TokenType.LeftParen)) {
       const expression = this.parseExpression();
@@ -311,6 +342,10 @@ export class Parser {
 
     if (this.match(TokenType.Number)) {
       return this.createNumberLiteral(this.previous());
+    }
+
+    if (this.match(TokenType.Null)) {
+      return this.parseNullLiteral();
     }
 
     if (this.match(TokenType.String)) {

@@ -8,11 +8,13 @@ import type {
   Expression,
   ForStatement,
   Identifier,
+  NullLiteral,
   NumberLiteral,
   NumberLiteralType,
   Program,
   Statement,
   StringLiteral,
+  TypeName,
   UnaryExpression,
   VariableDeclaration,
 } from './ast';
@@ -40,6 +42,7 @@ export type NativeFunctionValue = {
 };
 
 export type NullValue = {
+  nullType: TypeName | null;
   type: 'null';
   value: null;
 };
@@ -198,7 +201,7 @@ export class Interpreter {
           const renderedArgs = args.map((arg) => this.runtimeValueToString(arg));
           console.log(...renderedArgs);
 
-          return { type: 'null', value: null };
+          return { nullType: null, type: 'null', value: null };
         },
         name: 'print',
         type: 'native-function',
@@ -208,7 +211,7 @@ export class Interpreter {
   }
 
   public execute(program: Program): RuntimeValue {
-    let lastValue: RuntimeValue = { type: 'null', value: null };
+    let lastValue: RuntimeValue = { nullType: null, type: 'null', value: null };
 
     for (const statement of program.body) {
       lastValue = this.executeStatement(statement);
@@ -337,6 +340,8 @@ export class Interpreter {
         return this.evaluateIdentifier(expression);
       case 'NumberLiteral':
         return this.evaluateNumberLiteral(expression);
+      case 'NullLiteral':
+        return this.evaluateNullLiteral(expression);
       case 'StringLiteral':
         return this.evaluateStringLiteral(expression);
       case 'UnaryExpression':
@@ -346,6 +351,14 @@ export class Interpreter {
 
   private evaluateIdentifier(expression: Identifier): RuntimeValue {
     return this.scope.lookup(expression.name);
+  }
+
+  private evaluateNullLiteral(expression: NullLiteral): RuntimeValue {
+    return {
+      nullType: expression.nullType,
+      type: 'null',
+      value: null,
+    };
   }
 
   private evaluateNumberLiteral(expression: NumberLiteral): RuntimeValue {
@@ -384,7 +397,7 @@ export class Interpreter {
 
   private executeForStatement(statement: ForStatement): RuntimeValue {
     const iterable = this.evaluateExpression(statement.iterable);
-    let lastValue: RuntimeValue = { type: 'null', value: null };
+    let lastValue: RuntimeValue = { nullType: null, type: 'null', value: null };
 
     if (iterable.type !== 'array') {
       throw createTypeError('For loop iterable must be an array');
@@ -398,7 +411,7 @@ export class Interpreter {
           this.scope.define(statement.index.name, { numberType: 'int', type: 'number', value: index }, false);
         }
 
-        let bodyValue: RuntimeValue = { type: 'null', value: null };
+        let bodyValue: RuntimeValue = { nullType: null, type: 'null', value: null };
 
         for (const bodyStatement of statement.body) {
           bodyValue = this.executeStatement(bodyStatement);

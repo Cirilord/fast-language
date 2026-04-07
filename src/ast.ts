@@ -48,6 +48,7 @@ export type Expression =
   | BinaryExpression
   | CallExpression
   | Identifier
+  | NullLiteral
   | NumberLiteral
   | StringLiteral
   | UnaryExpression;
@@ -78,10 +79,17 @@ export type NumberLiteral = {
 
 export type NumberLiteralType = 'double' | 'float' | 'int';
 
+export type NullLiteral = {
+  kind: 'NullLiteral';
+  nullType: TypeName;
+};
+
 export type StringLiteral = {
   kind: 'StringLiteral';
   value: string;
 };
+
+export type TypeName = 'array' | 'boolean' | 'double' | 'float' | 'int' | 'string';
 
 export type UnaryExpression = {
   argument: Expression;

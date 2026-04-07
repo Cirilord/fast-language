@@ -50,7 +50,15 @@
         },
         {
           "name": "keyword.control.fast",
-          "match": "\\b(?:for|of)\\b"
+          "match": "\\b(?:as|for|of)\\b"
+        },
+        {
+          "name": "constant.language.null.fast",
+          "match": "\\bnull\\b"
+        },
+        {
+          "name": "support.type.fast",
+          "match": "\\b(?:array|boolean|double|float|int|string)\\b"
         }
       ]
     },

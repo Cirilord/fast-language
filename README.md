@@ -11,6 +11,7 @@ Right now the project is implemented in TypeScript and already supports:
 - comparison expressions with `>`, `>=`, `<`, `<=`, `==`, and `!=`
 - compound assignment operators with `+=`, `-=`, `*=`, `/=`, and `%=`
 - typed number literals with required suffixes: `10i`, `20.0f`, `30.0d`
+- typed null literals with `null as type`
 - string literals with `"`
 - multiline strings with `` ` ``
 - line comments with `//`
@@ -33,6 +34,7 @@ val negative = -(5i + 2i);
 val rest = 10i % 3i;
 val isBigger = 10i > 5i;
 val isEqual = 10i == 10i;
+var nullableText = null as string;
 var x = 10i;
 
 x += 5i;
@@ -52,6 +54,7 @@ print(negative);
 print(rest);
 print(isBigger);
 print(isEqual);
+print(nullableText);
 print(x);
 ```
 
@@ -113,6 +116,8 @@ Then open a `.fast` file in the extension development window.
 - number literals must include a type suffix: `i` for integer, `f` for float, or `d` for double
 - integer literals cannot include a decimal point; use `20.0f` or `20.0d` for decimal values
 - arithmetic promotes mixed numeric types, and division between integers produces a `double`
+- `null` must declare the expected type with `as`, like `null as string`
+- accepted `null as` types are `array`, `boolean`, `double`, `float`, `int`, and `string`
 - normal strings must use `"`
 - multiline strings must use `` ` ``
 - line comments start with `//` and run until the end of the line

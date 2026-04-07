@@ -8,6 +8,7 @@ val negative = -(5i + 2i);
 val rest = 10i % 3i;
 val isBigger = 10i > 5i;
 val isEqual = 10i == 10i;
+var nullableText = null as string;
 var x = 10i;
 
 x += 5i;
@@ -31,4 +32,5 @@ print(negative);
 print(rest);
 print(isBigger);
 print(isEqual);
+print(nullableText);
 print(x);
