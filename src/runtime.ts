@@ -5,6 +5,7 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  DoWhileStatement,
   Expression,
   ForStatement,
   Identifier,
@@ -475,6 +476,33 @@ export class Interpreter {
     return this.scope.assign(statement.identifier.name, value);
   }
 
+  private executeDoWhileStatement(statement: DoWhileStatement): RuntimeValue {
+    let lastValue: RuntimeValue;
+    let shouldContinue: boolean;
+
+    do {
+      lastValue = this.withScope(() => {
+        let bodyValue: RuntimeValue = { type: 'null', value: null };
+
+        for (const bodyStatement of statement.body) {
+          bodyValue = this.executeStatement(bodyStatement);
+        }
+
+        return bodyValue;
+      });
+
+      const condition = this.evaluateExpression(statement.condition);
+
+      if (condition.type !== 'boolean') {
+        throw createTypeError('Do while condition must be a boolean');
+      }
+
+      shouldContinue = condition.value;
+    } while (shouldContinue);
+
+    return lastValue;
+  }
+
   private executeForStatement(statement: ForStatement): RuntimeValue {
     const iterable = this.evaluateExpression(statement.iterable);
     let lastValue: RuntimeValue = { type: 'null', value: null };
@@ -508,6 +536,8 @@ export class Interpreter {
     switch (statement.kind) {
       case 'AssignmentStatement':
         return this.executeAssignmentStatement(statement);
+      case 'DoWhileStatement':
+        return this.executeDoWhileStatement(statement);
       case 'ExpressionStatement':
         return this.evaluateExpression(statement.expression);
       case 'ForStatement':

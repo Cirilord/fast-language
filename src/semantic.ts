@@ -5,6 +5,7 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  DoWhileStatement,
   Expression,
   ExpressionStatement,
   ForStatement,
@@ -274,6 +275,20 @@ export class SemanticAnalyzer {
     return 'unknown';
   }
 
+  private analyzeDoWhileStatement(statement: DoWhileStatement): void {
+    this.withScope(() => {
+      for (const bodyStatement of statement.body) {
+        this.analyzeStatement(bodyStatement);
+      }
+    });
+
+    const conditionType = this.analyzeExpression(statement.condition);
+
+    if (conditionType !== 'boolean' && conditionType !== 'unknown') {
+      throw createTypeError(`Do while condition must be a boolean, got '${conditionType}'`);
+    }
+  }
+
   private analyzeExpression(expression: Expression): SemanticType {
     switch (expression.kind) {
       case 'ArrayLiteral':
@@ -351,6 +366,9 @@ export class SemanticAnalyzer {
     switch (statement.kind) {
       case 'AssignmentStatement':
         this.analyzeAssignmentStatement(statement);
+        return;
+      case 'DoWhileStatement':
+        this.analyzeDoWhileStatement(statement);
         return;
       case 'ExpressionStatement':
         this.analyzeExpressionStatement(statement);

@@ -3,6 +3,7 @@ import { type Token, TokenType } from './token';
 import { Char } from './utils/char';
 
 const KEYWORDS: Record<string, TokenType> = {
+  do: TokenType.Do,
   for: TokenType.For,
   null: TokenType.Null,
   of: TokenType.Of,

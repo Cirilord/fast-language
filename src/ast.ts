@@ -3,7 +3,13 @@ export type Program = {
   kind: 'Program';
 };
 
-export type Statement = AssignmentStatement | ExpressionStatement | ForStatement | VariableDeclaration | WhileStatement;
+export type Statement =
+  | AssignmentStatement
+  | DoWhileStatement
+  | ExpressionStatement
+  | ForStatement
+  | VariableDeclaration
+  | WhileStatement;
 
 export type SourceLocation = {
   column: number;
@@ -23,6 +29,12 @@ export type ForStatement = {
   index?: Identifier;
   iterable: Expression;
   kind: 'ForStatement';
+};
+
+export type DoWhileStatement = {
+  body: Statement[];
+  condition: Expression;
+  kind: 'DoWhileStatement';
 };
 
 export type VariableDeclaration = {

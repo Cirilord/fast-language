@@ -5,6 +5,7 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  DoWhileStatement,
   Expression,
   ExpressionStatement,
   ForStatement,
@@ -235,6 +236,22 @@ export class Parser {
     return expression;
   }
 
+  private parseDoWhileStatement(): DoWhileStatement {
+    const body = this.parseBlockStatement();
+
+    this.consume(TokenType.While, "Expected 'while' after do block.");
+    this.consume(TokenType.LeftParen, "Expected '(' after 'while'.");
+    const condition = this.parseExpression();
+    this.consume(TokenType.RightParen, "Expected ')' after do while condition.");
+    this.consume(TokenType.Semicolon, "Expected ';' after do while statement.");
+
+    return {
+      body,
+      condition,
+      kind: 'DoWhileStatement',
+    };
+  }
+
   private parseEquality(): Expression {
     let expression = this.parseComparison();
 
@@ -405,6 +422,10 @@ export class Parser {
 
     if (this.match(TokenType.For)) {
       return this.parseForStatement();
+    }
+
+    if (this.match(TokenType.Do)) {
+      return this.parseDoWhileStatement();
     }
 
     if (this.match(TokenType.While)) {
