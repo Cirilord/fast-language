@@ -31,12 +31,20 @@ export class Char {
     return char === '=';
   }
 
+  public static isLeftBrace(char: string): boolean {
+    return char === '{';
+  }
+
   public static isLeftBracket(char: string): boolean {
     return char === '[';
   }
 
   public static isLeftParen(char: string): boolean {
     return char === '(';
+  }
+
+  public static isRightBrace(char: string): boolean {
+    return char === '}';
   }
 
   public static isRightBracket(char: string): boolean {

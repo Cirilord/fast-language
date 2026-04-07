@@ -3,7 +3,7 @@ export type Program = {
   kind: 'Program';
 };
 
-export type Statement = AssignmentStatement | ExpressionStatement | VariableDeclaration;
+export type Statement = AssignmentStatement | ExpressionStatement | ForStatement | VariableDeclaration;
 
 export type SourceLocation = {
   column: number;
@@ -14,6 +14,14 @@ export type AssignmentStatement = {
   identifier: Identifier;
   kind: 'AssignmentStatement';
   value: Expression;
+};
+
+export type ForStatement = {
+  body: Statement[];
+  element: Identifier;
+  index?: Identifier;
+  iterable: Expression;
+  kind: 'ForStatement';
 };
 
 export type VariableDeclaration = {

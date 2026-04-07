@@ -2,7 +2,10 @@ var a = 30;
 val b = "Test";
 val items = ["first", "second", "third"];
 
-print(items);
+for (var item, index of items) {
+  print(index);
+  print(item);
+}
 
 a = 50;
 

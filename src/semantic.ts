@@ -4,6 +4,7 @@ import type {
   CallExpression,
   Expression,
   ExpressionStatement,
+  ForStatement,
   Identifier,
   Program,
   Statement,
@@ -23,8 +24,10 @@ type SemanticSymbol = {
 class SemanticScope {
   private readonly symbols = new Map<string, SemanticSymbol>();
 
+  public constructor(private readonly parent?: SemanticScope) {}
+
   public assign(name: string, type: SemanticType, location?: Identifier['location']): SemanticSymbol {
-    const symbol = this.symbols.get(name);
+    const symbol = this.resolve(name);
 
     if (symbol === undefined) {
       throw createReferenceError(`Binding '${name}' is not defined`, location);
@@ -47,7 +50,7 @@ class SemanticScope {
   }
 
   public lookup(name: string, location?: Identifier['location']): SemanticSymbol {
-    const symbol = this.symbols.get(name);
+    const symbol = this.resolve(name);
 
     if (symbol === undefined) {
       throw createReferenceError(`Binding '${name}' is not defined`, location);
@@ -55,10 +58,14 @@ class SemanticScope {
 
     return symbol;
   }
+
+  private resolve(name: string): SemanticSymbol | undefined {
+    return this.symbols.get(name) ?? this.parent?.resolve(name);
+  }
 }
 
 export class SemanticAnalyzer {
-  private readonly scope = new SemanticScope();
+  private scope = new SemanticScope();
 
   public constructor() {
     this.scope.define({
@@ -121,6 +128,42 @@ export class SemanticAnalyzer {
     this.analyzeExpression(statement.expression);
   }
 
+  private analyzeForStatement(statement: ForStatement): void {
+    const iterableType = this.analyzeExpression(statement.iterable);
+
+    if (iterableType !== 'array' && iterableType !== 'unknown') {
+      throw createTypeError('For loop iterable must be an array', statement.element.location);
+    }
+
+    this.withScope(() => {
+      this.scope.define(
+        {
+          callable: false,
+          mutable: true,
+          name: statement.element.name,
+          type: 'unknown',
+        },
+        statement.element.location
+      );
+
+      if (statement.index !== undefined) {
+        this.scope.define(
+          {
+            callable: false,
+            mutable: false,
+            name: statement.index.name,
+            type: 'number',
+          },
+          statement.index.location
+        );
+      }
+
+      for (const bodyStatement of statement.body) {
+        this.analyzeStatement(bodyStatement);
+      }
+    });
+  }
+
   private analyzeIdentifier(expression: Identifier): SemanticType {
     return this.scope.lookup(expression.name, expression.location).type;
   }
@@ -136,6 +179,9 @@ export class SemanticAnalyzer {
         return;
       case 'ExpressionStatement':
         this.analyzeExpressionStatement(statement);
+        return;
+      case 'ForStatement':
+        this.analyzeForStatement(statement);
         return;
       case 'VariableDeclaration':
         this.analyzeVariableDeclaration(statement);
@@ -158,5 +204,16 @@ export class SemanticAnalyzer {
       },
       statement.identifier.location
     );
+  }
+
+  private withScope(callback: () => void): void {
+    const previousScope = this.scope;
+    this.scope = new SemanticScope(previousScope);
+
+    try {
+      callback();
+    } finally {
+      this.scope = previousScope;
+    }
   }
 }

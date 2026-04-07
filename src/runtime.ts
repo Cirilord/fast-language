@@ -3,6 +3,7 @@ import type {
   AssignmentStatement,
   CallExpression,
   Expression,
+  ForStatement,
   Identifier,
   NumberLiteral,
   Program,
@@ -48,8 +49,10 @@ export type StringValue = {
 class Scope {
   private readonly bindings = new Map<string, Binding>();
 
+  public constructor(private readonly parent?: Scope) {}
+
   public assign(name: string, value: RuntimeValue): RuntimeValue {
-    const binding = this.bindings.get(name);
+    const binding = this.resolve(name);
 
     if (!binding) {
       throw createReferenceError(`Binding '${name}' is not defined`);
@@ -73,7 +76,7 @@ class Scope {
   }
 
   public lookup(name: string): RuntimeValue {
-    const binding = this.bindings.get(name);
+    const binding = this.resolve(name);
 
     if (!binding) {
       throw createReferenceError(`Binding '${name}' is not defined`);
@@ -81,10 +84,14 @@ class Scope {
 
     return binding.value;
   }
+
+  private resolve(name: string): Binding | undefined {
+    return this.bindings.get(name) ?? this.parent?.resolve(name);
+  }
 }
 
 export class Interpreter {
-  private readonly scope = new Scope();
+  private scope = new Scope();
 
   public constructor() {
     this.scope.define(
@@ -169,12 +176,43 @@ export class Interpreter {
     return this.scope.assign(statement.identifier.name, value);
   }
 
+  private executeForStatement(statement: ForStatement): RuntimeValue {
+    const iterable = this.evaluateExpression(statement.iterable);
+    let lastValue: RuntimeValue = { type: 'null', value: null };
+
+    if (iterable.type !== 'array') {
+      throw createTypeError('For loop iterable must be an array');
+    }
+
+    for (const [index, element] of iterable.elements.entries()) {
+      lastValue = this.withScope(() => {
+        this.scope.define(statement.element.name, element, true);
+
+        if (statement.index !== undefined) {
+          this.scope.define(statement.index.name, { type: 'number', value: index }, false);
+        }
+
+        let bodyValue: RuntimeValue = { type: 'null', value: null };
+
+        for (const bodyStatement of statement.body) {
+          bodyValue = this.executeStatement(bodyStatement);
+        }
+
+        return bodyValue;
+      });
+    }
+
+    return lastValue;
+  }
+
   private executeStatement(statement: Statement): RuntimeValue {
     switch (statement.kind) {
       case 'AssignmentStatement':
         return this.executeAssignmentStatement(statement);
       case 'ExpressionStatement':
         return this.evaluateExpression(statement.expression);
+      case 'ForStatement':
+        return this.executeForStatement(statement);
       case 'VariableDeclaration':
         return this.executeVariableDeclaration(statement);
     }
@@ -198,6 +236,17 @@ export class Interpreter {
         return String(value.value);
       case 'string':
         return value.value;
+    }
+  }
+
+  private withScope(callback: () => RuntimeValue): RuntimeValue {
+    const previousScope = this.scope;
+    this.scope = new Scope(previousScope);
+
+    try {
+      return callback();
+    } finally {
+      this.scope = previousScope;
     }
   }
 }

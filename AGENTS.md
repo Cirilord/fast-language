@@ -20,6 +20,8 @@ This file tracks working conventions for the `fast` language project so future c
 - Normal strings use `"`.
 - Multiline strings use `` ` ``.
 - Arrays use `[value, value]`.
+- `for` loops use `for (var element of array) { ... }`.
+- `for` loops can access index with `for (var element, index of array) { ... }`.
 
 ## Code Conventions
 

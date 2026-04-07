@@ -2,6 +2,8 @@ import { type Token, TokenType } from './token';
 import { Char } from './utils/char';
 
 const KEYWORDS: Record<string, TokenType> = {
+  for: TokenType.For,
+  of: TokenType.Of,
   val: TokenType.Val,
   var: TokenType.Var,
 };
@@ -45,8 +47,18 @@ export class Lexer {
         continue;
       }
 
+      if (Char.isLeftBrace(char)) {
+        tokens.push(this.makeToken(TokenType.LeftBrace, char, startColumn));
+        continue;
+      }
+
       if (Char.isRightBracket(char)) {
         tokens.push(this.makeToken(TokenType.RightBracket, char, startColumn));
+        continue;
+      }
+
+      if (Char.isRightBrace(char)) {
+        tokens.push(this.makeToken(TokenType.RightBrace, char, startColumn));
         continue;
       }
 

@@ -4,6 +4,7 @@ import type {
   CallExpression,
   Expression,
   ExpressionStatement,
+  ForStatement,
   Identifier,
   NumberLiteral,
   Program,
@@ -125,6 +126,18 @@ export class Parser {
     };
   }
 
+  private parseBlockStatement(): Statement[] {
+    this.consume(TokenType.LeftBrace, "Expected '{' before block.");
+    const body: Statement[] = [];
+
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      body.push(this.parseStatement());
+    }
+
+    this.consume(TokenType.RightBrace, "Expected '}' after block.");
+    return body;
+  }
+
   private parseCallExpression(): Expression {
     const expression = this.parsePrimary();
 
@@ -153,6 +166,32 @@ export class Parser {
 
   private parseExpression(): Expression {
     return this.parseCallExpression();
+  }
+
+  private parseForStatement(): ForStatement {
+    this.consume(TokenType.LeftParen, "Expected '(' after 'for'.");
+    this.consume(TokenType.Var, "Expected 'var' in for loop declaration.");
+    const element = this.consume(TokenType.Identifier, 'Expected element identifier in for loop.');
+    const index = this.match(TokenType.Comma)
+      ? this.consume(TokenType.Identifier, "Expected index identifier after ','.")
+      : null;
+
+    this.consume(TokenType.Of, "Expected 'of' in for loop.");
+    const iterable = this.parseExpression();
+    this.consume(TokenType.RightParen, "Expected ')' after for loop declaration.");
+
+    const forStatement: ForStatement = {
+      body: this.parseBlockStatement(),
+      element: this.createIdentifier(element),
+      iterable,
+      kind: 'ForStatement',
+    };
+
+    if (index !== null) {
+      forStatement.index = this.createIdentifier(index);
+    }
+
+    return forStatement;
   }
 
   private parsePrimary(): Expression {
@@ -188,6 +227,10 @@ export class Parser {
 
     if (this.match(TokenType.Val)) {
       return this.parseVariableDeclaration('val');
+    }
+
+    if (this.match(TokenType.For)) {
+      return this.parseForStatement();
     }
 
     if (this.check(TokenType.Identifier) && this.checkNext(TokenType.Equals)) {
