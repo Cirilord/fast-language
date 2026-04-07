@@ -45,6 +45,10 @@ function isEqualityOperator(operator: BinaryOperator): boolean {
   return operator === '==' || operator === '!=';
 }
 
+function isLogicalOperator(operator: BinaryOperator): boolean {
+  return operator === '&&' || operator === '||';
+}
+
 function isRelationalOperator(operator: BinaryOperator): boolean {
   return operator === '>' || operator === '>=' || operator === '<' || operator === '<=';
 }
@@ -208,6 +212,26 @@ export class SemanticAnalyzer {
   private analyzeBinaryExpression(expression: BinaryExpression): SemanticType {
     const leftType = this.analyzeExpression(expression.left);
     const rightType = this.analyzeExpression(expression.right);
+
+    if (isLogicalOperator(expression.operator)) {
+      if ((leftType !== 'boolean' && leftType !== 'unknown') || (rightType !== 'boolean' && rightType !== 'unknown')) {
+        throw createTypeError(`Operator '${expression.operator}' expects boolean operands`);
+      }
+
+      return 'boolean';
+    }
+
+    if (expression.operator === '??') {
+      if (leftType === 'null') {
+        return rightType;
+      }
+
+      if (rightType === 'null' || areTypesCompatible(leftType, rightType)) {
+        return leftType;
+      }
+
+      throw createTypeError(`Operator '${expression.operator}' expects compatible operands`);
+    }
 
     if (isEqualityOperator(expression.operator)) {
       if (isNumericType(leftType) && isNumericType(rightType)) {

@@ -105,6 +105,10 @@ function isEqualityOperator(operator: BinaryOperator): boolean {
   return operator === '==' || operator === '!=';
 }
 
+function isLogicalOperator(operator: BinaryOperator): boolean {
+  return operator === '&&' || operator === '||';
+}
+
 function toBinaryOperator(operator: AssignmentOperator): BinaryOperator {
   switch (operator) {
     case '&&=':
@@ -297,6 +301,29 @@ export class Interpreter {
 
   private evaluateBinaryExpression(expression: BinaryExpression): RuntimeValue {
     const left = this.evaluateExpression(expression.left);
+
+    if (isLogicalOperator(expression.operator)) {
+      if (left.type !== 'boolean') {
+        throw createTypeError(`Operator '${expression.operator}' expects boolean operands`);
+      }
+
+      if ((expression.operator === '&&' && !left.value) || (expression.operator === '||' && left.value)) {
+        return left;
+      }
+
+      const right = this.evaluateExpression(expression.right);
+
+      if (right.type !== 'boolean') {
+        throw createTypeError(`Operator '${expression.operator}' expects boolean operands`);
+      }
+
+      return right;
+    }
+
+    if (expression.operator === '??') {
+      return left.type === 'null' ? this.evaluateExpression(expression.right) : left;
+    }
+
     const right = this.evaluateExpression(expression.right);
 
     if (isEqualityOperator(expression.operator)) {
@@ -365,7 +392,9 @@ export class Interpreter {
         };
       case '!=':
       case '==':
-        throw createTypeError(`Operator '${expression.operator}' should be handled as equality`);
+      case '&&':
+      case '||':
+        throw createTypeError(`Operator '${expression.operator}' should be handled before arithmetic`);
     }
   }
 

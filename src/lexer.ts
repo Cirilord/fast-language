@@ -57,9 +57,12 @@ export class Lexer {
             tokens.push(this.makeToken(TokenType.AmpersandAmpersandEquals, '&&=', startColumn));
             continue;
           }
+
+          tokens.push(this.makeToken(TokenType.AmpersandAmpersand, '&&', startColumn));
+          continue;
         }
 
-        throw createSyntaxError("Unexpected character '&'. Did you mean '&&='?", {
+        throw createSyntaxError("Unexpected character '&'. Did you mean '&&' or '&&='?", {
           column: startColumn,
           line: this.line,
         });
@@ -177,9 +180,12 @@ export class Lexer {
             tokens.push(this.makeToken(TokenType.PipePipeEquals, '||=', startColumn));
             continue;
           }
+
+          tokens.push(this.makeToken(TokenType.PipePipe, '||', startColumn));
+          continue;
         }
 
-        throw createSyntaxError("Unexpected character '|'. Did you mean '||='?", {
+        throw createSyntaxError("Unexpected character '|'. Did you mean '||' or '||='?", {
           column: startColumn,
           line: this.line,
         });
@@ -194,9 +200,12 @@ export class Lexer {
             tokens.push(this.makeToken(TokenType.QuestionQuestionEquals, '??=', startColumn));
             continue;
           }
+
+          tokens.push(this.makeToken(TokenType.QuestionQuestion, '??', startColumn));
+          continue;
         }
 
-        throw createSyntaxError("Unexpected character '?'. Did you mean '??='?", {
+        throw createSyntaxError("Unexpected character '?'. Did you mean '??' or '??='?", {
           column: startColumn,
           line: this.line,
         });

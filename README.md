@@ -9,6 +9,7 @@ Right now the project is implemented in TypeScript and already supports:
 - reassignment for `var`
 - arithmetic expressions with `+`, `-`, `*`, `/`, `%`, unary `-`, and grouped expressions with `(...)`
 - comparison expressions with `>`, `>=`, `<`, `<=`, `==`, and `!=`
+- logical expressions with `&&`, `||`, and `??`
 - compound assignment operators with `+=`, `-=`, `*=`, `/=`, and `%=`
 - logical assignment operators with `&&=`, `||=`, and `??=`
 - typed numeric declarations like `var count: int = 10;`
@@ -44,6 +45,9 @@ var x: int = 10;
 var counter: int = 0;
 var shouldPrint: boolean = 10 > 5;
 var shouldFallback: boolean = 5 > 10;
+val canPrint: boolean = shouldPrint && shouldFallback;
+val canFallback: boolean = shouldPrint || shouldFallback;
+val fallbackText: string = nullableText ?? "Default text";
 
 x += 5;
 x -= 2;
@@ -76,6 +80,9 @@ print(nullableText);
 print(x);
 print(shouldPrint);
 print(shouldFallback);
+print(canPrint);
+print(canFallback);
+print(fallbackText);
 ```
 
 ## Project Flow
@@ -129,6 +136,8 @@ Then open a `.fast` file in the extension development window.
 - only `var` can be reassigned
 - arithmetic operators currently expect number operands
 - compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands
+- logical operators `&&` and `||` expect boolean operands and short-circuit
+- nullish coalescing `??` returns the right value only when the left value is `null`
 - logical assignment operators `&&=` and `||=` expect boolean operands
 - nullish assignment `??=` assigns only when the current value is `null`
 - comparison operators `>`, `>=`, `<`, and `<=` expect number operands and return booleans

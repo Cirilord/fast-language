@@ -19,6 +19,8 @@ This file tracks working conventions for the `fast` language project so future c
 - only `var` can be reassigned.
 - Arithmetic operators currently expect number operands, including `%` for modulo.
 - Comparison operators `>`, `>=`, `<`, `<=`, `==`, and `!=` return booleans.
+- Logical operators `&&` and `||` expect boolean operands and short-circuit.
+- Nullish coalescing `??` returns the right value only when the left value is `null`.
 - Compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands.
 - Logical assignment operators `&&=` and `||=` expect boolean operands.
 - Nullish assignment `??=` assigns only when the current value is `null`.

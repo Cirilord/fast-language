@@ -85,6 +85,10 @@
           "match": "(?:&&=|\\|\\|=|\\?\\?=|\\+=|-=|\\*=|/=|%=|=)"
         },
         {
+          "name": "keyword.operator.logical.fast",
+          "match": "(?:&&|\\|\\||\\?\\?)"
+        },
+        {
           "name": "keyword.operator.arithmetic.fast",
           "match": "[+\\-*/%]"
         }

@@ -1,4 +1,5 @@
 export enum TokenType {
+  AmpersandAmpersand = 'AMPERSAND_AMPERSAND',
   AmpersandAmpersandEquals = 'AMPERSAND_AMPERSAND_EQUALS',
   BangEqual = 'BANG_EQUAL',
   Colon = 'COLON',
@@ -22,9 +23,11 @@ export enum TokenType {
   Of = 'OF',
   Percent = 'PERCENT',
   PercentEquals = 'PERCENT_EQUALS',
+  PipePipe = 'PIPE_PIPE',
   PipePipeEquals = 'PIPE_PIPE_EQUALS',
   Plus = 'PLUS',
   PlusEquals = 'PLUS_EQUALS',
+  QuestionQuestion = 'QUESTION_QUESTION',
   QuestionQuestionEquals = 'QUESTION_QUESTION_EQUALS',
   RightBrace = 'RIGHT_BRACE',
   RightBracket = 'RIGHT_BRACKET',

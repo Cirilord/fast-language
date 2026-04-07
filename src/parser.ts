@@ -254,7 +254,7 @@ export class Parser {
   }
 
   private parseExpression(): Expression {
-    return this.parseEquality();
+    return this.parseNullishCoalescing();
   }
 
   private parseFactor(): Expression {
@@ -301,10 +301,64 @@ export class Parser {
     return forStatement;
   }
 
+  private parseLogicalAnd(): Expression {
+    let expression = this.parseEquality();
+
+    while (this.match(TokenType.AmpersandAmpersand)) {
+      const operator = this.previous().lexeme as BinaryOperator;
+      const right = this.parseEquality();
+
+      expression = {
+        kind: 'BinaryExpression',
+        left: expression,
+        operator,
+        right,
+      } satisfies BinaryExpression;
+    }
+
+    return expression;
+  }
+
+  private parseLogicalOr(): Expression {
+    let expression = this.parseLogicalAnd();
+
+    while (this.match(TokenType.PipePipe)) {
+      const operator = this.previous().lexeme as BinaryOperator;
+      const right = this.parseLogicalAnd();
+
+      expression = {
+        kind: 'BinaryExpression',
+        left: expression,
+        operator,
+        right,
+      } satisfies BinaryExpression;
+    }
+
+    return expression;
+  }
+
   private parseNullLiteral(): NullLiteral {
     return {
       kind: 'NullLiteral',
     };
+  }
+
+  private parseNullishCoalescing(): Expression {
+    let expression = this.parseLogicalOr();
+
+    while (this.match(TokenType.QuestionQuestion)) {
+      const operator = this.previous().lexeme as BinaryOperator;
+      const right = this.parseLogicalOr();
+
+      expression = {
+        kind: 'BinaryExpression',
+        left: expression,
+        operator,
+        right,
+      } satisfies BinaryExpression;
+    }
+
+    return expression;
   }
 
   private parsePrimary(): Expression {
