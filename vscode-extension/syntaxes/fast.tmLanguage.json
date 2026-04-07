@@ -50,7 +50,7 @@
         },
         {
           "name": "keyword.control.fast",
-          "match": "\\b(?:for|of)\\b"
+          "match": "\\b(?:for|of|while)\\b"
         },
         {
           "name": "constant.language.null.fast",

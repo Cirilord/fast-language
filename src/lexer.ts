@@ -8,6 +8,7 @@ const KEYWORDS: Record<string, TokenType> = {
   of: TokenType.Of,
   val: TokenType.Val,
   var: TokenType.Var,
+  while: TokenType.While,
 };
 
 export class Lexer {

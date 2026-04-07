@@ -12,6 +12,7 @@ val price: float = 20.0;
 val precise: double = 30.0;
 var nullableText: string = null;
 var x: int = 10;
+var counter: int = 0;
 
 x += 5;
 x -= 2;
@@ -23,6 +24,11 @@ x /= 2;
 //   print(index);
 //   print(item);
 // }
+
+while (counter < 3) {
+  print(counter);
+  counter += 1;
+}
 
 a = 50;
 

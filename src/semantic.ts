@@ -16,6 +16,7 @@ import type {
   TypeName,
   UnaryExpression,
   VariableDeclaration,
+  WhileStatement,
 } from './ast';
 import { createReferenceError, createSyntaxError, createTypeError } from './errors';
 
@@ -308,6 +309,9 @@ export class SemanticAnalyzer {
       case 'VariableDeclaration':
         this.analyzeVariableDeclaration(statement);
         return;
+      case 'WhileStatement':
+        this.analyzeWhileStatement(statement);
+        return;
     }
   }
 
@@ -344,6 +348,20 @@ export class SemanticAnalyzer {
       },
       statement.identifier.location
     );
+  }
+
+  private analyzeWhileStatement(statement: WhileStatement): void {
+    const conditionType = this.analyzeExpression(statement.condition);
+
+    if (conditionType !== 'boolean' && conditionType !== 'unknown') {
+      throw createTypeError(`While condition must be a boolean, got '${conditionType}'`);
+    }
+
+    this.withScope(() => {
+      for (const bodyStatement of statement.body) {
+        this.analyzeStatement(bodyStatement);
+      }
+    });
   }
 
   private withScope(callback: () => void): void {

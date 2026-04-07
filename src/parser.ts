@@ -18,6 +18,7 @@ import type {
   UnaryExpression,
   UnaryOperator,
   VariableDeclaration,
+  WhileStatement,
 } from './ast';
 import { createSyntaxError } from './errors';
 import { TokenType, type Token } from './token';
@@ -349,6 +350,10 @@ export class Parser {
       return this.parseForStatement();
     }
 
+    if (this.match(TokenType.While)) {
+      return this.parseWhileStatement();
+    }
+
     if (this.check(TokenType.Identifier) && this.isAssignmentOperatorToken(this.peekNext().type)) {
       return this.parseAssignmentStatement();
     }
@@ -409,6 +414,18 @@ export class Parser {
       initializer,
       kind: 'VariableDeclaration',
       typeAnnotation: this.getTypeName(type),
+    };
+  }
+
+  private parseWhileStatement(): WhileStatement {
+    this.consume(TokenType.LeftParen, "Expected '(' after 'while'.");
+    const condition = this.parseExpression();
+    this.consume(TokenType.RightParen, "Expected ')' after while condition.");
+
+    return {
+      body: this.parseBlockStatement(),
+      condition,
+      kind: 'WhileStatement',
     };
   }
 

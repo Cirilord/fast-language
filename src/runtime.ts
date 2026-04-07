@@ -16,6 +16,7 @@ import type {
   TypeName,
   UnaryExpression,
   VariableDeclaration,
+  WhileStatement,
 } from './ast';
 import { createReferenceError, createTypeError } from './errors';
 
@@ -454,6 +455,8 @@ export class Interpreter {
         return this.executeForStatement(statement);
       case 'VariableDeclaration':
         return this.executeVariableDeclaration(statement);
+      case 'WhileStatement':
+        return this.executeWhileStatement(statement);
     }
   }
 
@@ -466,6 +469,34 @@ export class Interpreter {
       statement.declarationType === 'var',
       statement.typeAnnotation
     );
+  }
+
+  private executeWhileStatement(statement: WhileStatement): RuntimeValue {
+    let lastValue: RuntimeValue = { type: 'null', value: null };
+
+    while (true) {
+      const condition = this.evaluateExpression(statement.condition);
+
+      if (condition.type !== 'boolean') {
+        throw createTypeError('While condition must be a boolean');
+      }
+
+      if (!condition.value) {
+        break;
+      }
+
+      lastValue = this.withScope(() => {
+        let bodyValue: RuntimeValue = { type: 'null', value: null };
+
+        for (const bodyStatement of statement.body) {
+          bodyValue = this.executeStatement(bodyStatement);
+        }
+
+        return bodyValue;
+      });
+    }
+
+    return lastValue;
   }
 
   private runtimeValueToString(value: RuntimeValue): string {

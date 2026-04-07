@@ -18,6 +18,7 @@ Right now the project is implemented in TypeScript and already supports:
 - line comments with `//`
 - array literals with `[value, value]`
 - `for ... of` loops with optional index binding
+- `while` loops with boolean conditions
 - generic function-call parsing like `print(a);`
 - a builtin `print(...)` in the interpreter
 - local VS Code syntax highlighting support in `vscode-extension`
@@ -39,6 +40,7 @@ val price: float = 20.0;
 val precise: double = 30.0;
 var nullableText: string = null;
 var x: int = 10;
+var counter: int = 0;
 
 x += 5;
 x -= 2;
@@ -49,6 +51,11 @@ x /= 2;
 for (var item, index of items) {
   print(index);
   print(item);
+}
+
+while (counter < 3) {
+  print(counter);
+  counter += 1;
 }
 
 print(result);
@@ -130,6 +137,7 @@ Then open a `.fast` file in the extension development window.
 - arrays use `[value, value]`
 - `for` loops use `for (var element of array) { ... }`
 - `for` loops can access index with `for (var element, index of array) { ... }`
+- `while` loops use `while (condition) { ... }` and the condition must be boolean
 - `print` is treated as an identifier in the lexer and as a builtin at runtime
 - symbol existence, callability, and `val` reassignment are checked semantically before execution
 

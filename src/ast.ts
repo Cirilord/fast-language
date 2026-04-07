@@ -3,7 +3,7 @@ export type Program = {
   kind: 'Program';
 };
 
-export type Statement = AssignmentStatement | ExpressionStatement | ForStatement | VariableDeclaration;
+export type Statement = AssignmentStatement | ExpressionStatement | ForStatement | VariableDeclaration | WhileStatement;
 
 export type SourceLocation = {
   column: number;
@@ -31,6 +31,12 @@ export type VariableDeclaration = {
   initializer: Expression;
   kind: 'VariableDeclaration';
   typeAnnotation: TypeName;
+};
+
+export type WhileStatement = {
+  body: Statement[];
+  condition: Expression;
+  kind: 'WhileStatement';
 };
 
 export type ExpressionStatement = {

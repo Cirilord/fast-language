@@ -34,6 +34,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Arrays use `[value, value]`.
 - `for` loops use `for (var element of array) { ... }`.
 - `for` loops can access index with `for (var element, index of array) { ... }`.
+- `while` loops use `while (condition) { ... }`, and the condition must be boolean.
 
 ## Code Conventions
 

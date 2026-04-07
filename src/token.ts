@@ -34,6 +34,7 @@ export enum TokenType {
   String = 'STRING',
   Val = 'VAL',
   Var = 'VAR',
+  While = 'WHILE',
 }
 
 export type Token = {
