@@ -5,8 +5,10 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  ClassConstructor,
   ClassDeclaration,
   ClassMethod,
+  ClassProperty,
   ConditionalExpression,
   DoWhileStatement,
   ExportDeclaration,
@@ -48,6 +50,11 @@ export type SemanticSymbol = {
 export type SemanticModuleExports = ReadonlyMap<string, SemanticSymbol>;
 
 export type SemanticImportResolver = (source: string) => SemanticModuleExports;
+
+type ResolvedClassMember = {
+  member: ClassMethod | ClassProperty;
+  owner: ClassDeclaration;
+};
 
 function isNumericType(type: SemanticType): type is NumberLiteralType {
   return type === 'double' || type === 'float' || type === 'int';
@@ -149,6 +156,7 @@ class SemanticScope {
 }
 
 export class SemanticAnalyzer {
+  private currentClass: ClassDeclaration | undefined;
   private currentReturnType: FunctionReturnType | undefined;
   private readonly exports = new Map<string, SemanticSymbol>();
   private scope = new SemanticScope();
@@ -204,7 +212,39 @@ export class SemanticAnalyzer {
     const type = this.analyzeExpression(statement.value);
 
     if (statement.target.kind === 'MemberExpression') {
-      this.analyzeMemberExpression(statement.target);
+      const resolved = this.resolveMemberExpression(statement.target);
+
+      if (resolved.member.kind !== 'ClassProperty') {
+        throw createTypeError(
+          `Cannot assign to method '${statement.target.property.name}'`,
+          statement.target.property.location
+        );
+      }
+
+      if (resolved.member.declarationType === 'val') {
+        throw createTypeError(
+          `Cannot reassign immutable property '${statement.target.property.name}'`,
+          statement.target.property.location
+        );
+      }
+
+      if (statement.operator !== '=' && statement.operator !== '??=') {
+        if (!isNumericType(resolved.member.typeAnnotation) || !isNumericType(type)) {
+          throw createTypeError(
+            `Operator '${statement.operator}' expects number operands`,
+            statement.target.property.location
+          );
+        }
+        return;
+      }
+
+      if (!areTypesCompatible(resolved.member.typeAnnotation, type)) {
+        throw createTypeError(
+          `Cannot assign value of type '${type}' to property '${statement.target.property.name}' of type '${resolved.member.typeAnnotation}'`,
+          statement.target.property.location
+        );
+      }
+
       return;
     }
 
@@ -307,6 +347,39 @@ export class SemanticAnalyzer {
   }
 
   private analyzeCallExpression(expression: CallExpression): SemanticType {
+    if (expression.callee.kind === 'MemberExpression') {
+      const resolved = this.resolveMemberExpression(expression.callee);
+
+      if (resolved.member.kind !== 'ClassMethod') {
+        throw createTypeError(
+          `Member '${expression.callee.property.name}' is not callable`,
+          expression.callee.property.location
+        );
+      }
+
+      this.analyzeArguments(
+        expression.arguments,
+        resolved.member.parameters.map((parameter) => parameter.typeAnnotation),
+        expression.callee.property.name
+      );
+
+      return resolved.member.returnType;
+    }
+
+    if (expression.callee.kind === 'SuperExpression') {
+      const currentClass = this.requireCurrentClass('super');
+
+      if (currentClass.baseClass === undefined) {
+        throw createTypeError("'super()' can only be used in classes with a base class");
+      }
+
+      const baseClass = this.getClassDeclaration(currentClass.baseClass);
+      const constructorMember = this.getConstructor(baseClass);
+      const parameterTypes = constructorMember?.parameters.map((parameter) => parameter.typeAnnotation) ?? [];
+      this.analyzeArguments(expression.arguments, parameterTypes, 'super');
+      return 'void';
+    }
+
     if (expression.callee.kind !== 'Identifier') {
       this.analyzeExpression(expression.callee);
 
@@ -375,6 +448,10 @@ export class SemanticAnalyzer {
       }
     }
 
+    if (!statement.abstract) {
+      this.ensureImplementsBaseVirtualMethods(statement);
+    }
+
     for (const implemented of statement.implements) {
       const contract = this.scope.lookup(implemented.name, implemented.location);
 
@@ -389,13 +466,18 @@ export class SemanticAnalyzer {
     }
 
     this.ensureSingleConstructor(statement);
+    this.ensureConstructorRules(statement);
+    this.ensureOverridesAreValid(statement);
     this.analyzeClassMembers(statement);
   }
 
   private analyzeClassMembers(statement: ClassDeclaration): void {
+    const previousClass = this.currentClass;
     const previousReturnType = this.currentReturnType;
 
     try {
+      this.currentClass = statement;
+
       for (const member of statement.members) {
         if (member.kind === 'ClassProperty') {
           const initializerType = this.analyzeExpression(member.initializer);
@@ -422,6 +504,13 @@ export class SemanticAnalyzer {
         }
 
         if (member.body === undefined) {
+          if (!statement.virtual && !member.virtual) {
+            throw createTypeError(
+              `Method signature '${member.name.name}' must be virtual in abstract class '${statement.identifier.name}'`,
+              member.name.location
+            );
+          }
+
           if (!statement.abstract && !statement.virtual) {
             throw createTypeError(
               `Concrete class '${statement.identifier.name}' cannot contain method signature '${member.name.name}'`,
@@ -448,6 +537,7 @@ export class SemanticAnalyzer {
         }
       }
     } finally {
+      this.currentClass = previousClass;
       this.currentReturnType = previousReturnType;
     }
   }
@@ -525,9 +615,9 @@ export class SemanticAnalyzer {
       case 'StringLiteral':
         return this.analyzeStringLiteral();
       case 'SuperExpression':
-        return 'unknown';
+        return this.analyzeSuperExpression();
       case 'ThisExpression':
-        return 'unknown';
+        return this.analyzeThisExpression();
       case 'UnaryExpression':
         return this.analyzeUnaryExpression(expression);
     }
@@ -655,8 +745,13 @@ export class SemanticAnalyzer {
   }
 
   private analyzeMemberExpression(expression: MemberExpression): SemanticType {
-    this.analyzeExpression(expression.object);
-    return 'unknown';
+    const resolved = this.resolveMemberExpression(expression);
+
+    if (resolved.member.kind === 'ClassProperty') {
+      return resolved.member.typeAnnotation;
+    }
+
+    return 'function';
   }
 
   private analyzeNewExpression(expression: NewExpression): SemanticType {
@@ -673,6 +768,7 @@ export class SemanticAnalyzer {
       );
     }
 
+    this.ensureConstructorIsAccessible(symbol.classDeclaration, expression.callee);
     const constructorMember = symbol.classDeclaration.members.find((member) => member.kind === 'ClassConstructor');
     const parameterTypes = constructorMember?.parameters.map((parameter) => parameter.typeAnnotation) ?? [];
     this.analyzeArguments(expression.arguments, parameterTypes, expression.callee.name);
@@ -754,6 +850,20 @@ export class SemanticAnalyzer {
 
   private analyzeStringLiteral(): SemanticType {
     return 'string';
+  }
+
+  private analyzeSuperExpression(): SemanticType {
+    const currentClass = this.requireCurrentClass('super');
+
+    if (currentClass.baseClass === undefined) {
+      throw createTypeError("'super' can only be used in classes with a base class");
+    }
+
+    return currentClass.baseClass.name;
+  }
+
+  private analyzeThisExpression(): SemanticType {
+    return this.requireCurrentClass('this').identifier.name;
   }
 
   private analyzeUnaryExpression(expression: UnaryExpression): SemanticType {
@@ -840,6 +950,80 @@ export class SemanticAnalyzer {
     }
   }
 
+  private ensureConstructorIsAccessible(statement: ClassDeclaration, location: Identifier): void {
+    const constructorMember = this.getConstructor(statement);
+
+    if (constructorMember === undefined || constructorMember.access === 'public') {
+      return;
+    }
+
+    const currentClass = this.currentClass;
+
+    if (constructorMember.access === 'private' && currentClass?.identifier.name !== statement.identifier.name) {
+      throw createTypeError(`Constructor '${statement.identifier.name}' is private`, location.location);
+    }
+
+    if (
+      constructorMember.access === 'protected' &&
+      (currentClass === undefined || !this.isSameOrSubclass(currentClass, statement))
+    ) {
+      throw createTypeError(`Constructor '${statement.identifier.name}' is protected`, location.location);
+    }
+  }
+
+  private ensureConstructorRules(statement: ClassDeclaration): void {
+    if (statement.baseClass === undefined) {
+      return;
+    }
+
+    const baseClass = this.getClassDeclaration(statement.baseClass);
+    const baseConstructor = this.getConstructor(baseClass);
+    const constructorMember = this.getConstructor(statement);
+
+    if (constructorMember === undefined) {
+      if ((baseConstructor?.parameters.length ?? 0) > 0) {
+        throw createTypeError(
+          `Class '${statement.identifier.name}' must declare a constructor and call super`,
+          statement.identifier.location
+        );
+      }
+
+      return;
+    }
+
+    if (!this.hasLeadingSuperCall(constructorMember)) {
+      throw createTypeError(
+        `Constructor for '${statement.identifier.name}' must start with super()`,
+        statement.identifier.location
+      );
+    }
+  }
+
+  private ensureImplementsBaseVirtualMethods(statement: ClassDeclaration): void {
+    const requiredMethods = this.getInheritedVirtualMethods(statement);
+    const concreteMethods = this.getConcreteMethods(statement);
+
+    for (const requiredMethod of requiredMethods) {
+      const implementation = concreteMethods.get(requiredMethod.name.name);
+
+      if (implementation === undefined) {
+        throw createTypeError(
+          `Class '${statement.identifier.name}' must implement inherited virtual method '${requiredMethod.name.name}'`,
+          statement.identifier.location
+        );
+      }
+
+      if (!implementation.override) {
+        throw createTypeError(
+          `Method '${implementation.name.name}' must use 'override' to implement inherited virtual method`,
+          implementation.name.location
+        );
+      }
+
+      this.ensureMethodsHaveSameSignature(implementation, requiredMethod);
+    }
+  }
+
   private ensureImplementsContract(statement: ClassDeclaration, contract: ClassDeclaration): void {
     const methods = this.getConcreteMethods(statement);
 
@@ -880,6 +1064,70 @@ export class SemanticAnalyzer {
     }
   }
 
+  private ensureMemberIsAccessible(resolved: ResolvedClassMember, location: Identifier['location']): void {
+    if (resolved.member.access === 'public') {
+      return;
+    }
+
+    if (this.currentClass === undefined) {
+      throw createTypeError(`Member '${resolved.member.name.name}' is ${resolved.member.access}`, location);
+    }
+
+    if (resolved.member.access === 'private' && this.currentClass.identifier.name !== resolved.owner.identifier.name) {
+      throw createTypeError(`Member '${resolved.member.name.name}' is private`, location);
+    }
+
+    if (resolved.member.access === 'protected' && !this.isSameOrSubclass(this.currentClass, resolved.owner)) {
+      throw createTypeError(`Member '${resolved.member.name.name}' is protected`, location);
+    }
+  }
+
+  private ensureMethodsHaveSameSignature(method: ClassMethod, inheritedMethod: ClassMethod): void {
+    if (
+      method.returnType !== inheritedMethod.returnType ||
+      !this.haveSameParameters(method.parameters, inheritedMethod.parameters)
+    ) {
+      throw createTypeError(`Method '${method.name.name}' must match inherited method signature`, method.name.location);
+    }
+  }
+
+  private ensureOverridesAreValid(statement: ClassDeclaration): void {
+    const implementedMethodNames = new Set<string>();
+
+    for (const implemented of statement.implements) {
+      const contract = this.getClassDeclaration(implemented);
+
+      for (const member of contract.members) {
+        if (member.kind === 'ClassMethod') {
+          implementedMethodNames.add(member.name.name);
+        }
+      }
+    }
+
+    for (const member of statement.members) {
+      if (member.kind !== 'ClassMethod' || member.body === undefined) {
+        continue;
+      }
+
+      const inheritedMethod = this.getInheritedMethod(statement, member.name.name, member.static);
+
+      if (inheritedMethod === undefined && !implementedMethodNames.has(member.name.name) && member.override) {
+        throw createTypeError(
+          `Method '${member.name.name}' uses override but does not override anything`,
+          member.name.location
+        );
+      }
+
+      if (inheritedMethod !== undefined && !member.override) {
+        throw createTypeError(`Method '${member.name.name}' must use override`, member.name.location);
+      }
+
+      if (inheritedMethod !== undefined) {
+        this.ensureMethodsHaveSameSignature(member, inheritedMethod);
+      }
+    }
+  }
+
   private ensureSingleConstructor(statement: ClassDeclaration): void {
     const constructors = statement.members.filter((member) => member.kind === 'ClassConstructor');
 
@@ -889,6 +1137,16 @@ export class SemanticAnalyzer {
         statement.identifier.location
       );
     }
+  }
+
+  private getClassDeclaration(identifier: Identifier): ClassDeclaration {
+    const symbol = this.scope.lookup(identifier.name, identifier.location);
+
+    if (symbol.classDeclaration === undefined) {
+      throw createTypeError(`Binding '${identifier.name}' is not a class`, identifier.location);
+    }
+
+    return symbol.classDeclaration;
   }
 
   private getConcreteMethods(statement: ClassDeclaration): Map<string, ClassMethod> {
@@ -901,6 +1159,97 @@ export class SemanticAnalyzer {
     }
 
     return methods;
+  }
+
+  private getConstructor(statement: ClassDeclaration): ClassConstructor | undefined {
+    return statement.members.find((member): member is ClassConstructor => member.kind === 'ClassConstructor');
+  }
+
+  private getInheritedMethod(statement: ClassDeclaration, name: string, isStatic: boolean): ClassMethod | undefined {
+    if (statement.baseClass === undefined) {
+      return undefined;
+    }
+
+    const baseClass = this.getClassDeclaration(statement.baseClass);
+    const baseMethod = this.getMethod(baseClass, name, isStatic);
+
+    if (baseMethod !== undefined) {
+      return baseMethod.member;
+    }
+
+    return this.getInheritedMethod(baseClass, name, isStatic);
+  }
+
+  private getInheritedVirtualMethods(statement: ClassDeclaration): ClassMethod[] {
+    if (statement.baseClass === undefined) {
+      return [];
+    }
+
+    const baseClass = this.getClassDeclaration(statement.baseClass);
+    const inheritedMethods = this.getInheritedVirtualMethods(baseClass);
+    const directVirtualMethods = baseClass.members.filter(
+      (member): member is ClassMethod => member.kind === 'ClassMethod' && member.body === undefined
+    );
+
+    return [...inheritedMethods, ...directVirtualMethods];
+  }
+
+  private getMember(statement: ClassDeclaration, name: string, isStatic: boolean): ResolvedClassMember | undefined {
+    return this.getProperty(statement, name, isStatic) ?? this.getMethod(statement, name, isStatic);
+  }
+
+  private getMethod(
+    statement: ClassDeclaration,
+    name: string,
+    isStatic: boolean
+  ): { member: ClassMethod; owner: ClassDeclaration } | undefined {
+    const method = statement.members.find(
+      (member): member is ClassMethod =>
+        member.kind === 'ClassMethod' && member.name.name === name && member.static === isStatic
+    );
+
+    if (method !== undefined) {
+      return {
+        member: method,
+        owner: statement,
+      };
+    }
+
+    if (statement.baseClass !== undefined) {
+      return this.getMethod(this.getClassDeclaration(statement.baseClass), name, isStatic);
+    }
+
+    return undefined;
+  }
+
+  private getProperty(statement: ClassDeclaration, name: string, isStatic: boolean): ResolvedClassMember | undefined {
+    const property = statement.members.find(
+      (member): member is ClassProperty =>
+        member.kind === 'ClassProperty' && member.name.name === name && member.static === isStatic
+    );
+
+    if (property !== undefined) {
+      return {
+        member: property,
+        owner: statement,
+      };
+    }
+
+    if (statement.baseClass !== undefined) {
+      return this.getProperty(this.getClassDeclaration(statement.baseClass), name, isStatic);
+    }
+
+    return undefined;
+  }
+
+  private hasLeadingSuperCall(constructorMember: ClassConstructor): boolean {
+    const [firstStatement] = constructorMember.body;
+
+    return (
+      firstStatement?.kind === 'ExpressionStatement' &&
+      firstStatement.expression.kind === 'CallExpression' &&
+      firstStatement.expression.callee.kind === 'SuperExpression'
+    );
   }
 
   private hasReturnStatement(statements: Statement[]): boolean {
@@ -928,6 +1277,97 @@ export class SemanticAnalyzer {
     }
 
     return left.every((parameter, index) => parameter.typeAnnotation === right[index]?.typeAnnotation);
+  }
+
+  private isSameOrSubclass(candidate: ClassDeclaration, base: ClassDeclaration): boolean {
+    if (candidate.identifier.name === base.identifier.name) {
+      return true;
+    }
+
+    if (candidate.baseClass === undefined) {
+      return false;
+    }
+
+    return this.isSameOrSubclass(this.getClassDeclaration(candidate.baseClass), base);
+  }
+
+  private requireCurrentClass(keyword: 'super' | 'this'): ClassDeclaration {
+    if (this.currentClass === undefined) {
+      throw createTypeError(`'${keyword}' can only be used inside classes`);
+    }
+
+    return this.currentClass;
+  }
+
+  private resolveMemberExpression(expression: MemberExpression): ResolvedClassMember {
+    if (expression.object.kind === 'SuperExpression') {
+      const currentClass = this.requireCurrentClass('super');
+
+      if (currentClass.baseClass === undefined) {
+        throw createTypeError("'super' can only be used in classes with a base class", expression.property.location);
+      }
+
+      const baseClass = this.getClassDeclaration(currentClass.baseClass);
+      const member = this.getMember(baseClass, expression.property.name, false);
+
+      if (member === undefined) {
+        throw createReferenceError(`Member '${expression.property.name}' is not defined`, expression.property.location);
+      }
+
+      this.ensureMemberIsAccessible(member, expression.property.location);
+      return member;
+    }
+
+    if (expression.object.kind === 'Identifier') {
+      const objectSymbol = this.scope.lookup(expression.object.name, expression.object.location);
+
+      if (objectSymbol.classDeclaration !== undefined) {
+        const member = this.getMember(objectSymbol.classDeclaration, expression.property.name, true);
+
+        if (member === undefined) {
+          throw createReferenceError(
+            `Static member '${expression.property.name}' is not defined`,
+            expression.property.location
+          );
+        }
+
+        this.ensureMemberIsAccessible(member, expression.property.location);
+        return member;
+      }
+    }
+
+    const objectType = this.analyzeExpression(expression.object);
+
+    if (objectType === 'unknown') {
+      return {
+        member: {
+          access: 'public',
+          body: [],
+          kind: 'ClassMethod',
+          name: expression.property,
+          override: false,
+          parameters: [],
+          returnType: 'unknown',
+          static: false,
+          virtual: false,
+        },
+        owner: this.requireCurrentClass('this'),
+      };
+    }
+
+    const objectClass = this.getClassDeclaration({
+      kind: 'Identifier',
+      location: expression.property.location,
+      name: objectType,
+    });
+    const member = this.getMember(objectClass, expression.property.name, false);
+
+    if (member === undefined) {
+      throw createReferenceError(`Member '${expression.property.name}' is not defined`, expression.property.location);
+    }
+
+    this.ensureMemberIsAccessible(member, expression.property.location);
+    return member;
   }
 
   private withScope(callback: () => void): void {

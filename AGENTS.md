@@ -50,12 +50,16 @@ This file tracks working conventions for the `fast` language project so future c
 - Abstract virtual contracts use `abstract virtual class Name { ... }`.
 - Classes can extend one base class with `extends` and implement abstract virtual contracts with `implements`.
 - Class members must include an explicit access modifier: `public`, `protected`, or `private`.
+- `public`, `protected`, and `private` are checked semantically on member access and constructor calls.
 - Class properties require `var` or `val` to define mutability, like `public var name: string = "Fast";`.
 - `static` comes after the access modifier and before `var`/`val`, like `public static val label: string = "User";`.
 - Constructors use `public constructor(parameter: type) { ... }`.
 - Methods require return annotations and can accept parameters, like `public name(prefix: string): string { ... }`.
 - Abstract virtual class methods use signatures without bodies, like `public print(): void;`.
 - Implemented contract methods use `override`, like `public override print(): void { ... }`.
+- Overrides of inherited methods must use `override` and match the inherited signature.
+- Concrete classes must implement inherited virtual methods.
+- Subclass constructors must start with `super()` when extending a base class.
 - Objects are created with `new Name()` and members are accessed with `.`.
 - `this` is available in constructors and methods, and `super()`/`super.method()` are available in subclasses.
 - Named imports use `import { name } from "./file";` and resolve local `.fast` files.

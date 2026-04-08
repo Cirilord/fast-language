@@ -17,6 +17,7 @@ Right now the project is implemented in TypeScript and already supports:
 - `void` functions with `function name(): void { ... }`
 - classes with mandatory access modifiers and `var`/`val` property mutability
 - `abstract virtual class` contracts with `implements`
+- semantic checks for class member access, inherited overrides, virtual methods, and constructor visibility
 - object instantiation with `new ClassName()`
 - member access with `.`, including `this`, `super`, and static members
 - named imports with `import { name } from "./file";`
@@ -260,12 +261,16 @@ Then open a `.fast` file in the extension development window.
 - abstract virtual contracts use `abstract virtual class Name { ... }`
 - classes can extend one base class with `extends` and implement abstract virtual contracts with `implements`
 - class members require `public`, `protected`, or `private`
+- `public`, `protected`, and `private` are checked semantically on member access and constructor calls
 - class properties require `var` or `val`, like `public var name: string = "Fast";`
 - `static` comes after the access modifier and before `var`/`val`, like `public static val label: string = "User";`
 - constructors use `public constructor(parameter: type) { ... }`
 - methods use return annotations and can accept parameters, like `public name(prefix: string): string { ... }`
 - abstract virtual class methods use signatures without bodies, like `public print(): void;`
 - implemented contract methods use `override`, like `public override print(): void { ... }`
+- overrides of inherited methods must use `override` and match the inherited signature
+- concrete classes must implement inherited virtual methods
+- subclass constructors must start with `super()` when extending a base class
 - objects are created with `new Name()` and members are accessed with `.`
 - `this` is available in constructors and methods, and `super()`/`super.method()` are available in subclasses
 - `print` is treated as an identifier in the lexer and as a builtin at runtime

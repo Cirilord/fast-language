@@ -511,6 +511,12 @@ export class Interpreter {
       }
 
       return lastValue;
+    } catch (error) {
+      if (error instanceof ReturnSignal) {
+        return error.value;
+      }
+
+      throw error;
     } finally {
       this.scope = previousScope;
     }
