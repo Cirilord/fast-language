@@ -50,7 +50,7 @@
         },
         {
           "name": "keyword.control.fast",
-          "match": "\\b(?:do|for|function|of|return|while)\\b"
+          "match": "\\b(?:do|export|for|from|function|import|of|return|while)\\b"
         },
         {
           "name": "constant.language.null.fast",

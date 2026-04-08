@@ -7,11 +7,13 @@ import type {
   CallExpression,
   ConditionalExpression,
   DoWhileStatement,
+  ExportDeclaration,
   Expression,
   ForStatement,
-  FunctionReturnType,
   FunctionDeclaration,
+  FunctionReturnType,
   Identifier,
+  ImportDeclaration,
   NumberLiteral,
   NumberLiteralType,
   Program,
@@ -79,6 +81,10 @@ export type RuntimeValue =
   | NumberValue
   | StringValue
   | UserFunctionValue;
+
+export type RuntimeModuleExports = ReadonlyMap<string, RuntimeValue>;
+
+export type RuntimeImportResolver = (source: string) => RuntimeModuleExports;
 
 class ReturnSignal {
   public constructor(public readonly value: RuntimeValue) {}
@@ -251,9 +257,10 @@ function evaluateCompoundAssignment(
 }
 
 export class Interpreter {
+  private readonly exports = new Map<string, RuntimeValue>();
   private scope = new Scope();
 
-  public constructor() {
+  public constructor(private readonly resolveImport?: RuntimeImportResolver) {
     this.scope.define(
       'print',
       {
@@ -278,6 +285,10 @@ export class Interpreter {
     }
 
     return lastValue;
+  }
+
+  public getExports(): RuntimeModuleExports {
+    return this.exports;
   }
 
   private callUserFunction(callee: UserFunctionValue): RuntimeValue {
@@ -569,6 +580,23 @@ export class Interpreter {
     return lastValue;
   }
 
+  private executeExportDeclaration(statement: ExportDeclaration): RuntimeValue {
+    const value =
+      statement.declaration === undefined
+        ? ({ type: 'null', value: null } satisfies NullValue)
+        : this.executeStatement(statement.declaration);
+
+    const identifier = statement.declaration?.identifier ?? statement.identifier;
+
+    if (identifier === undefined) {
+      throw createTypeError('Expected exported binding name');
+    }
+
+    this.exports.set(identifier.name, this.scope.lookup(identifier.name));
+
+    return value;
+  }
+
   private executeForStatement(statement: ForStatement): RuntimeValue {
     const iterable = this.evaluateExpression(statement.iterable);
     let lastValue: RuntimeValue = { type: 'null', value: null };
@@ -612,6 +640,26 @@ export class Interpreter {
     );
   }
 
+  private executeImportDeclaration(statement: ImportDeclaration): RuntimeValue {
+    if (this.resolveImport === undefined) {
+      throw createTypeError('Imports are not supported in this interpreter mode');
+    }
+
+    const moduleExports = this.resolveImport(statement.source.value);
+
+    for (const identifier of statement.identifiers) {
+      const value = moduleExports.get(identifier.name);
+
+      if (value === undefined) {
+        throw createReferenceError(`Module '${statement.source.value}' does not export '${identifier.name}'`);
+      }
+
+      this.scope.define(identifier.name, value, false);
+    }
+
+    return { type: 'null', value: null };
+  }
+
   private executeReturnStatement(statement: ReturnStatement): RuntimeValue {
     const value =
       statement.value === undefined
@@ -627,12 +675,16 @@ export class Interpreter {
         return this.executeAssignmentStatement(statement);
       case 'DoWhileStatement':
         return this.executeDoWhileStatement(statement);
+      case 'ExportDeclaration':
+        return this.executeExportDeclaration(statement);
       case 'ExpressionStatement':
         return this.evaluateExpression(statement.expression);
       case 'ForStatement':
         return this.executeForStatement(statement);
       case 'FunctionDeclaration':
         return this.executeFunctionDeclaration(statement);
+      case 'ImportDeclaration':
+        return this.executeImportDeclaration(statement);
       case 'ReturnStatement':
         return this.executeReturnStatement(statement);
       case 'VariableDeclaration':

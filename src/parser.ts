@@ -7,12 +7,14 @@ import type {
   CallExpression,
   ConditionalExpression,
   DoWhileStatement,
+  ExportDeclaration,
   Expression,
   ExpressionStatement,
   ForStatement,
-  FunctionReturnType,
   FunctionDeclaration,
+  FunctionReturnType,
   Identifier,
+  ImportDeclaration,
   NullLiteral,
   NumberLiteral,
   Program,
@@ -301,6 +303,37 @@ export class Parser {
     return expression;
   }
 
+  private parseExportDeclaration(): ExportDeclaration {
+    if (this.match(TokenType.Var)) {
+      return {
+        declaration: this.parseVariableDeclaration('var'),
+        kind: 'ExportDeclaration',
+      };
+    }
+
+    if (this.match(TokenType.Val)) {
+      return {
+        declaration: this.parseVariableDeclaration('val'),
+        kind: 'ExportDeclaration',
+      };
+    }
+
+    if (this.match(TokenType.Function)) {
+      return {
+        declaration: this.parseFunctionDeclaration(),
+        kind: 'ExportDeclaration',
+      };
+    }
+
+    const identifier = this.consume(TokenType.Identifier, "Expected exported binding name after 'export'.");
+    this.consume(TokenType.Semicolon, "Expected ';' after export declaration.");
+
+    return {
+      identifier: this.createIdentifier(identifier),
+      kind: 'ExportDeclaration',
+    };
+  }
+
   private parseExpression(): Expression {
     return this.parseConditionalExpression();
   }
@@ -361,6 +394,30 @@ export class Parser {
       identifier: this.createIdentifier(name),
       kind: 'FunctionDeclaration',
       returnType: this.getFunctionReturnType(returnType),
+    };
+  }
+
+  private parseImportDeclaration(): ImportDeclaration {
+    this.consume(TokenType.LeftBrace, "Expected '{' after 'import'.");
+    const identifiers: Identifier[] = [];
+
+    do {
+      const identifier = this.consume(TokenType.Identifier, 'Expected imported binding name.');
+      identifiers.push(this.createIdentifier(identifier));
+    } while (this.match(TokenType.Comma) && !this.check(TokenType.RightBrace));
+
+    this.consume(TokenType.RightBrace, "Expected '}' after imported binding list.");
+    this.consume(TokenType.From, "Expected 'from' after imported binding list.");
+    const source = this.consume(TokenType.String, "Expected module path string after 'from'.");
+    this.consume(TokenType.Semicolon, "Expected ';' after import declaration.");
+
+    return {
+      identifiers,
+      kind: 'ImportDeclaration',
+      source: {
+        kind: 'StringLiteral',
+        value: source.lexeme,
+      },
     };
   }
 
@@ -474,6 +531,14 @@ export class Parser {
   }
 
   private parseStatement(): Statement {
+    if (this.match(TokenType.Import)) {
+      return this.parseImportDeclaration();
+    }
+
+    if (this.match(TokenType.Export)) {
+      return this.parseExportDeclaration();
+    }
+
     if (this.match(TokenType.Var)) {
       return this.parseVariableDeclaration('var');
     }
@@ -549,20 +614,26 @@ export class Parser {
 
   private parseVariableDeclaration(declarationType: 'var' | 'val'): VariableDeclaration {
     const name = this.consume(TokenType.Identifier, `Expected identifier after '${declarationType}'.`);
-    this.consume(TokenType.Colon, "Expected ':' after variable name.");
-    const type = this.consume(TokenType.Identifier, "Expected type name after ':'.");
+    const type = this.match(TokenType.Colon)
+      ? this.consume(TokenType.Identifier, "Expected type name after ':'.")
+      : undefined;
 
     this.consume(TokenType.Equals, "Expected '=' after variable name.");
     const initializer = this.parseExpression();
     this.consume(TokenType.Semicolon, "Expected ';' after variable declaration.");
 
-    return {
+    const declaration: VariableDeclaration = {
       declarationType,
       identifier: this.createIdentifier(name),
       initializer,
       kind: 'VariableDeclaration',
-      typeAnnotation: this.getTypeName(type),
     };
+
+    if (type !== undefined) {
+      declaration.typeAnnotation = this.getTypeName(type);
+    }
+
+    return declaration;
   }
 
   private parseWhileStatement(): WhileStatement {

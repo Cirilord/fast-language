@@ -1,0 +1,9 @@
+var importedText = "Imported text";
+
+function logImportedText(): void {
+  print(importedText);
+  return;
+}
+
+export importedText;
+export logImportedText;

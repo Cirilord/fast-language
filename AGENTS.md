@@ -10,6 +10,7 @@ This file tracks working conventions for the `fast` language project so future c
 - The language already has a lexer, parser, semantic analyzer, and interpreter.
 - Local VS Code syntax highlighting lives in `vscode-extension`.
 - Runtime name resolution is currently handled through `Scope` in `src/runtime.ts`.
+- Module loading is centralized in `src/module.ts`.
 - The active sample program lives in `main.fast`.
 
 ## Language Conventions
@@ -29,9 +30,10 @@ This file tracks working conventions for the `fast` language project so future c
 - Unary `-` can be used with numbers and grouped numeric expressions.
 - Number literals no longer use suffixes; numeric variable types are `int`, `float`, and `double`.
 - Integer literals do not use decimal points, like `10`; decimal literals use decimal points, like `20.0`.
-- Variable declarations must include a type annotation, like `var name: string = "Fast";`.
+- Variable declarations can include a type annotation, like `var name: string = "Fast";`.
+- Variable declarations can infer type from non-null initializers, like `var name = "Fast";`.
 - Accepted variable types are `array`, `boolean`, `double`, `float`, `int`, and `string`.
-- `null` uses the declared variable type, like `var name: string = null;`.
+- `null` declarations require an explicit declared type, like `var name: string = null;`.
 - `print` is not a lexer keyword; it is tokenized as `IDENTIFIER`.
 - Normal strings use `"`.
 - Multiline strings use `` ` ``.
@@ -44,12 +46,17 @@ This file tracks working conventions for the `fast` language project so future c
 - Functions currently use `function name(): type { return value; }` without parameters.
 - Function return values must match the declared return type.
 - Functions that do not return a value use `void`, like `function name(): void { ... }`.
+- Named imports use `import { name } from "./file";` and resolve local `.fast` files.
+- Named exports can be inline, like `export var name = "Fast";`.
+- Named exports can reference existing bindings, like `export name;`.
+- Imported bindings are immutable in the importing module.
 
 ## Code Conventions
 
 - Keep TypeScript lint-clean with `yarn lint`.
 - Keep formatting clean with `yarn format`.
 - `yarn lint` and `yarn format` should only check and report issues, not auto-fix them.
+- `yarn dev` watches TypeScript sources and `.fast` files, including imported modules.
 - Prefer explicit typing and follow the ESLint rules configured in `eslint.config.mjs`.
 - Keep the TypeScript configuration aligned with `@tsconfig/strictest` in `tsconfig.json`.
 - Character classification helpers should live in `src/utils/char.ts`.

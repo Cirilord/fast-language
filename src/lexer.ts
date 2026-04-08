@@ -4,8 +4,11 @@ import { Char } from './utils/char';
 
 const KEYWORDS: Record<string, TokenType> = {
   do: TokenType.Do,
+  export: TokenType.Export,
   for: TokenType.For,
+  from: TokenType.From,
   function: TokenType.Function,
+  import: TokenType.Import,
   null: TokenType.Null,
   of: TokenType.Of,
   return: TokenType.Return,

@@ -15,8 +15,11 @@ Right now the project is implemented in TypeScript and already supports:
 - logical assignment operators with `&&=`, `||=`, and `??=`
 - function declarations with `function name(): type { return value; }`
 - `void` functions with `function name(): void { ... }`
+- named imports with `import { name } from "./file";`
+- named exports with `export var`, `export val`, `export function`, and `export name;`
 - typed numeric declarations like `var count: int = 10;`
 - typed variable declarations like `var name: string = "Fast";`
+- inferred variable declarations like `var name = "Fast";`
 - contextual `null` values like `var name: string = null;`
 - string literals with `"`
 - multiline strings with `` ` ``
@@ -34,6 +37,8 @@ Right now the project is implemented in TypeScript and already supports:
 `main.fast`
 
 ```fast
+import { importedText, logImportedText } from "./file1";
+
 // Number types are declared on variables.
 val items: array = ["first", "second", "third"];
 val result: int = (10 + 5) * 2;
@@ -107,7 +112,23 @@ print(canFallback);
 print(fallbackText);
 print(status);
 print(computedStatus);
+print(importedText);
 logStatus();
+logImportedText();
+```
+
+`file1.fast`
+
+```fast
+var importedText = "Imported text";
+
+function logImportedText(): void {
+  print(importedText);
+  return;
+}
+
+export importedText;
+export logImportedText;
 ```
 
 ## Project Flow
@@ -127,8 +148,9 @@ Current file responsibilities:
 - `src/ast.ts`: AST node types
 - `src/semantic.ts`: semantic analysis before execution
 - `src/runtime.ts`: runtime values, `Scope`, and interpreter
+- `src/module.ts`: loads, analyzes, caches, and executes imported `.fast` modules
 - `src/utils/char.ts`: reusable character helpers
-- `src/index.ts`: entrypoint that reads `main.fast`
+- `src/index.ts`: entrypoint that executes `main.fast` through the module loader
 - `tsconfig.json`: project TypeScript config extending `@tsconfig/strictest`
 - `vscode-extension`: local VS Code extension for `.fast` syntax highlighting
 
@@ -141,6 +163,8 @@ yarn start
 yarn lint
 yarn format
 ```
+
+`yarn dev` watches TypeScript sources and `.fast` files, including imported modules.
 
 ## VS Code Syntax Highlighting
 
@@ -173,9 +197,14 @@ Then open a `.fast` file in the extension development window.
 - integer literals do not use decimal points, like `10`
 - decimal literals use decimal points, like `20.0`
 - numeric variable types are `int`, `float`, and `double`
-- variable declarations must include a type annotation, like `var name: string = "Fast";`
+- variable declarations can include a type annotation, like `var name: string = "Fast";`
+- variable declarations can infer type from non-null initializers, like `var name = "Fast";`
 - accepted variable types are `array`, `boolean`, `double`, `float`, `int`, and `string`
-- `null` uses the declared variable type, like `var name: string = null;`
+- `null` declarations require an explicit declared type, like `var name: string = null;`
+- named imports use `import { name } from "./file";` and resolve local `.fast` files
+- named exports can be inline, like `export var name = "Fast";`
+- named exports can reference existing bindings, like `export name;`
+- imported bindings are immutable in the importing module
 - normal strings must use `"`
 - multiline strings must use `` ` ``
 - line comments start with `//` and run until the end of the line
@@ -196,5 +225,4 @@ Possible next milestones:
 
 - multiple function arguments
 - nested scopes
-- user-defined functions
 - migration from TypeScript interpreter to C implementation

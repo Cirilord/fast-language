@@ -7,12 +7,14 @@ import type {
   CallExpression,
   ConditionalExpression,
   DoWhileStatement,
+  ExportDeclaration,
   Expression,
   ExpressionStatement,
   ForStatement,
   FunctionDeclaration,
   FunctionReturnType,
   Identifier,
+  ImportDeclaration,
   NumberLiteral,
   NumberLiteralType,
   Program,
@@ -25,9 +27,9 @@ import type {
 } from './ast';
 import { createReferenceError, createSyntaxError, createTypeError } from './errors';
 
-type SemanticType = 'function' | 'null' | 'void' | TypeName | 'unknown';
+export type SemanticType = 'function' | 'null' | 'void' | TypeName | 'unknown';
 
-type SemanticSymbol = {
+export type SemanticSymbol = {
   arity?: number;
   callable: boolean;
   mutable: boolean;
@@ -35,6 +37,10 @@ type SemanticSymbol = {
   returnType?: SemanticType;
   type: SemanticType;
 };
+
+export type SemanticModuleExports = ReadonlyMap<string, SemanticSymbol>;
+
+export type SemanticImportResolver = (source: string) => SemanticModuleExports;
 
 function isNumericType(type: SemanticType): type is NumberLiteralType {
   return type === 'double' || type === 'float' || type === 'int';
@@ -137,9 +143,10 @@ class SemanticScope {
 
 export class SemanticAnalyzer {
   private currentReturnType: FunctionReturnType | undefined;
+  private readonly exports = new Map<string, SemanticSymbol>();
   private scope = new SemanticScope();
 
-  public constructor() {
+  public constructor(private readonly resolveImport?: SemanticImportResolver) {
     this.scope.define({
       callable: true,
       mutable: false,
@@ -153,6 +160,10 @@ export class SemanticAnalyzer {
     for (const statement of program.body) {
       this.analyzeStatement(statement);
     }
+  }
+
+  public getExports(): SemanticModuleExports {
+    return this.exports;
   }
 
   private analyzeArrayLiteral(expression: ArrayLiteral): SemanticType {
@@ -325,6 +336,21 @@ export class SemanticAnalyzer {
     }
   }
 
+  private analyzeExportDeclaration(statement: ExportDeclaration): void {
+    if (statement.declaration !== undefined) {
+      this.analyzeStatement(statement.declaration);
+    }
+
+    const identifier = statement.declaration?.identifier ?? statement.identifier;
+
+    if (identifier === undefined) {
+      throw createSyntaxError('Expected exported binding name');
+    }
+
+    const symbol = this.scope.lookup(identifier.name, identifier.location);
+    this.exports.set(identifier.name, symbol);
+  }
+
   private analyzeExpression(expression: Expression): SemanticType {
     switch (expression.kind) {
       case 'ArrayLiteral':
@@ -426,6 +452,42 @@ export class SemanticAnalyzer {
     return this.scope.lookup(expression.name, expression.location).type;
   }
 
+  private analyzeImportDeclaration(statement: ImportDeclaration): void {
+    if (this.resolveImport === undefined) {
+      throw createSyntaxError('Imports are not supported in this analyzer mode');
+    }
+
+    const moduleExports = this.resolveImport(statement.source.value);
+
+    for (const identifier of statement.identifiers) {
+      const exportedSymbol = moduleExports.get(identifier.name);
+
+      if (exportedSymbol === undefined) {
+        throw createReferenceError(
+          `Module '${statement.source.value}' does not export '${identifier.name}'`,
+          identifier.location
+        );
+      }
+
+      const importedSymbol: SemanticSymbol = {
+        callable: exportedSymbol.callable,
+        mutable: false,
+        name: identifier.name,
+        type: exportedSymbol.type,
+      };
+
+      if (exportedSymbol.arity !== undefined) {
+        importedSymbol.arity = exportedSymbol.arity;
+      }
+
+      if (exportedSymbol.returnType !== undefined) {
+        importedSymbol.returnType = exportedSymbol.returnType;
+      }
+
+      this.scope.define(importedSymbol, identifier.location);
+    }
+  }
+
   private analyzeNullLiteral(): SemanticType {
     return 'null';
   }
@@ -468,6 +530,9 @@ export class SemanticAnalyzer {
       case 'DoWhileStatement':
         this.analyzeDoWhileStatement(statement);
         return;
+      case 'ExportDeclaration':
+        this.analyzeExportDeclaration(statement);
+        return;
       case 'ExpressionStatement':
         this.analyzeExpressionStatement(statement);
         return;
@@ -476,6 +541,9 @@ export class SemanticAnalyzer {
         return;
       case 'FunctionDeclaration':
         this.analyzeFunctionDeclaration(statement);
+        return;
+      case 'ImportDeclaration':
+        this.analyzeImportDeclaration(statement);
         return;
       case 'ReturnStatement':
         this.analyzeReturnStatement(statement);
@@ -510,9 +578,30 @@ export class SemanticAnalyzer {
       throw createTypeError(`Cannot initialize binding '${statement.identifier.name}' with void value`);
     }
 
+    if (statement.typeAnnotation === undefined) {
+      if (type === 'null') {
+        throw createTypeError(
+          `Cannot infer type for binding '${statement.identifier.name}' initialized with null`,
+          statement.identifier.location
+        );
+      }
+
+      this.scope.define(
+        {
+          callable: false,
+          mutable: statement.declarationType === 'var',
+          name: statement.identifier.name,
+          type,
+        },
+        statement.identifier.location
+      );
+      return;
+    }
+
     if (!areTypesCompatible(statement.typeAnnotation, type)) {
       throw createTypeError(
-        `Cannot initialize binding '${statement.identifier.name}' of type '${statement.typeAnnotation}' with value of type '${type}'`,
+        `Cannot initialize binding '${statement.identifier.name}' of type ` +
+          `'${statement.typeAnnotation}' with value of type '${type}'`,
         statement.identifier.location
       );
     }

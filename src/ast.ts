@@ -6,9 +6,11 @@ export type Program = {
 export type Statement =
   | AssignmentStatement
   | DoWhileStatement
+  | ExportDeclaration
   | ExpressionStatement
   | ForStatement
   | FunctionDeclaration
+  | ImportDeclaration
   | ReturnStatement
   | VariableDeclaration
   | WhileStatement;
@@ -39,11 +41,25 @@ export type DoWhileStatement = {
   kind: 'DoWhileStatement';
 };
 
+export type ExportableDeclaration = FunctionDeclaration | VariableDeclaration;
+
+export type ExportDeclaration = {
+  declaration?: ExportableDeclaration;
+  identifier?: Identifier;
+  kind: 'ExportDeclaration';
+};
+
 export type FunctionDeclaration = {
   body: Statement[];
   identifier: Identifier;
   kind: 'FunctionDeclaration';
   returnType: FunctionReturnType;
+};
+
+export type ImportDeclaration = {
+  identifiers: Identifier[];
+  kind: 'ImportDeclaration';
+  source: StringLiteral;
 };
 
 export type ReturnStatement = {
@@ -56,7 +72,7 @@ export type VariableDeclaration = {
   identifier: Identifier;
   initializer: Expression;
   kind: 'VariableDeclaration';
-  typeAnnotation: TypeName;
+  typeAnnotation?: TypeName;
 };
 
 export type WhileStatement = {

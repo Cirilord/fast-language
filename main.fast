@@ -1,3 +1,5 @@
+import { importedText, logImportedText } from "./file1";
+
 // Number types are declared on variables.
 var a: int = 30;
 val b: string = "Test";
@@ -77,4 +79,6 @@ print(canFallback);
 print(fallbackText);
 print(status);
 print(computedStatus);
+print(importedText);
 logStatus();
+logImportedText();
