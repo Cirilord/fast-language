@@ -13,10 +13,16 @@
       "include": "#numbers"
     },
     {
+      "include": "#declarations"
+    },
+    {
       "include": "#keywords"
     },
     {
       "include": "#builtins"
+    },
+    {
+      "include": "#identifiers"
     },
     {
       "include": "#operators"
@@ -29,35 +35,104 @@
     "builtins": {
       "patterns": [
         {
-          "name": "support.function.fast",
+          "name": "support.function.ts",
           "match": "\\bprint\\b"
+        },
+        {
+          "name": "support.function.ts",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()"
         }
       ]
     },
     "comments": {
       "patterns": [
         {
-          "name": "comment.line.double-slash.fast",
+          "name": "comment.line.double-slash.ts",
           "match": "//.*$"
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(function)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.function.ts"
+            },
+            "2": {
+              "name": "entity.name.function.ts"
+            }
+          }
+        },
+        {
+          "match": "\\b(var)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.ts"
+            },
+            "2": {
+              "name": "variable.other.readwrite.ts"
+            }
+          }
+        },
+        {
+          "match": "\\b(val)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.ts"
+            },
+            "2": {
+              "name": "variable.other.readwrite.ts"
+            }
+          }
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.readwrite.ts",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
         }
       ]
     },
     "keywords": {
       "patterns": [
         {
-          "name": "storage.modifier.fast",
-          "match": "\\b(?:val|var)\\b"
+          "name": "storage.type.ts",
+          "match": "\\bvar\\b"
         },
         {
-          "name": "keyword.control.fast",
-          "match": "\\b(?:do|export|for|from|function|import|of|return|while)\\b"
+          "name": "storage.type.ts",
+          "match": "\\bval\\b"
         },
         {
-          "name": "constant.language.null.fast",
+          "name": "keyword.control.loop.ts",
+          "match": "\\b(?:do|for|while)\\b"
+        },
+        {
+          "name": "keyword.operator.expression.of.ts",
+          "match": "\\bof\\b"
+        },
+        {
+          "name": "storage.type.function.ts",
+          "match": "\\bfunction\\b"
+        },
+        {
+          "name": "keyword.control.flow.ts",
+          "match": "\\breturn\\b"
+        },
+        {
+          "name": "keyword.control.ts",
+          "match": "\\b(?:export|from|import)\\b"
+        },
+        {
+          "name": "constant.language.null.ts",
           "match": "\\bnull\\b"
         },
         {
-          "name": "support.type.fast",
+          "name": "support.type.primitive.ts",
           "match": "\\b(?:array|boolean|double|float|int|string|void)\\b"
         }
       ]
@@ -65,11 +140,11 @@
     "numbers": {
       "patterns": [
         {
-          "name": "constant.numeric.double.fast",
+          "name": "constant.numeric.decimal.ts",
           "match": "\\b\\d+\\.\\d+\\b"
         },
         {
-          "name": "constant.numeric.integer.fast",
+          "name": "constant.numeric.decimal.ts",
           "match": "\\b\\d+\\b"
         }
       ]
@@ -77,23 +152,23 @@
     "operators": {
       "patterns": [
         {
-          "name": "keyword.operator.comparison.fast",
+          "name": "keyword.operator.comparison.ts",
           "match": "(?:==|!=|>=|<=|>|<)"
         },
         {
-          "name": "keyword.operator.assignment.fast",
+          "name": "keyword.operator.assignment.ts",
           "match": "(?:&&=|\\|\\|=|\\?\\?=|\\+=|-=|\\*=|/=|%=|=)"
         },
         {
-          "name": "keyword.operator.logical.fast",
+          "name": "keyword.operator.logical.ts",
           "match": "(?:&&|\\|\\||\\?\\?)"
         },
         {
-          "name": "keyword.operator.ternary.fast",
+          "name": "keyword.operator.ternary.ts",
           "match": "\\?"
         },
         {
-          "name": "keyword.operator.arithmetic.fast",
+          "name": "keyword.operator.arithmetic.ts",
           "match": "[+\\-*/%]"
         }
       ]
@@ -101,27 +176,27 @@
     "punctuation": {
       "patterns": [
         {
-          "name": "punctuation.terminator.statement.fast",
+          "name": "punctuation.terminator.statement.ts",
           "match": ";"
         },
         {
-          "name": "punctuation.separator.comma.fast",
+          "name": "punctuation.separator.comma.ts",
           "match": ","
         },
         {
-          "name": "punctuation.separator.type-annotation.fast",
+          "name": "punctuation.separator.type-annotation.ts",
           "match": ":"
         },
         {
-          "name": "punctuation.section.braces.fast",
+          "name": "punctuation.section.braces.ts",
           "match": "[{}]"
         },
         {
-          "name": "punctuation.section.brackets.fast",
+          "name": "punctuation.section.brackets.ts",
           "match": "[\\[\\]]"
         },
         {
-          "name": "punctuation.section.parens.fast",
+          "name": "punctuation.section.parens.ts",
           "match": "[()]"
         }
       ]
@@ -129,12 +204,12 @@
     "strings": {
       "patterns": [
         {
-          "name": "string.quoted.double.fast",
+          "name": "string.quoted.double.ts",
           "begin": "\"",
           "end": "\""
         },
         {
-          "name": "string.quoted.backtick.fast",
+          "name": "string.template.ts",
           "begin": "`",
           "end": "`"
         }
