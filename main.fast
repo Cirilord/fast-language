@@ -66,6 +66,7 @@ class BaseName {
 
   protected sayBase(): void {
     print(this.name);
+    print(this.constructor.name);
   }
 }
 
@@ -85,6 +86,10 @@ class User extends BaseName implements Printable {
   public override printName(): void {
     print(this.displayName);
     super.sayBase();
+  }
+
+  public override toString(): string {
+    return this.displayName;
   }
 }
 
@@ -154,10 +159,18 @@ print(fallbackText);
 print(status);
 print(computedStatus);
 print(genericStatus);
+// Functions also expose implicit metadata helpers.
+print(logGenericText);
+print(logGenericText.name);
+print(logGenericText.toString());
 print(importedStatus);
 print(importedText);
 print(profile);
 print(box.getValue());
+print(BaseName.name);
+print(BaseName.toString());
+print(user.toString());
+print(user);
 user.printName();
 User.showLabel();
 logStatus();

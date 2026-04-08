@@ -27,6 +27,7 @@ import type {
   ReturnStatement,
   Statement,
   StringLiteral,
+  TypeParameter,
   TypeName,
   TupleLiteral,
   UnaryExpression,
@@ -61,6 +62,7 @@ export type ClassValue = {
   abstract: boolean;
   baseClass?: ClassValue;
   constructorMember?: ClassConstructor;
+  declaration: ClassDeclaration;
   instanceMethods: Map<string, ClassMethod>;
   instanceProperties: ClassProperty[];
   name: string;
@@ -117,6 +119,7 @@ export type UserFunctionValue = {
   parameters: Parameter[];
   returnType: FunctionReturnType;
   type: 'function';
+  typeParameters: TypeParameter[];
 };
 
 export type RuntimeValue =
@@ -610,7 +613,19 @@ export class Interpreter {
 
   private createClassValue(statement: ClassDeclaration): ClassValue {
     const staticMethods = new Map<string, ClassMethod>();
-    const staticProperties = new Map<string, Binding>();
+    const staticProperties = new Map<string, Binding>([
+      [
+        'name',
+        {
+          mutable: false,
+          typeAnnotation: 'string',
+          value: {
+            type: 'string',
+            value: statement.identifier.name,
+          },
+        },
+      ],
+    ]);
     const instanceMethods = new Map<string, ClassMethod>();
     const instanceProperties: ClassProperty[] = [];
     let constructorMember: ClassConstructor | undefined;
@@ -648,6 +663,7 @@ export class Interpreter {
 
     const classValue: ClassValue = {
       abstract: statement.abstract,
+      declaration: statement,
       instanceMethods,
       instanceProperties,
       name: statement.identifier.name,
@@ -893,7 +909,55 @@ export class Interpreter {
     const object = this.evaluateExpression(expression.object);
     const propertyName = expression.property.name;
 
+    if (object.type === 'function') {
+      if (propertyName === 'name') {
+        return {
+          type: 'string',
+          value: object.name,
+        };
+      }
+
+      if (propertyName === 'toString') {
+        return {
+          call: (): RuntimeValue => ({
+            type: 'string',
+            value: this.renderUserFunctionValue(object),
+          }),
+          name: `${object.name}.toString`,
+          type: 'native-function',
+        };
+      }
+
+      throw createReferenceError(`Property '${propertyName}' is not defined`);
+    }
+
+    if (object.type === 'native-function') {
+      if (propertyName === 'name') {
+        return {
+          type: 'string',
+          value: object.name,
+        };
+      }
+
+      if (propertyName === 'toString') {
+        return {
+          call: (): RuntimeValue => ({
+            type: 'string',
+            value: `<native function ${object.name}>`,
+          }),
+          name: `${object.name}.toString`,
+          type: 'native-function',
+        };
+      }
+
+      throw createReferenceError(`Property '${propertyName}' is not defined`);
+    }
+
     if (object.type === 'instance') {
+      if (propertyName === 'constructor') {
+        return object.classValue;
+      }
+
       const field = object.fields.get(propertyName);
 
       if (field !== undefined) {
@@ -908,6 +972,17 @@ export class Interpreter {
           receiver: object,
           superClass: method.owner.baseClass,
           type: 'bound-method',
+        };
+      }
+
+      if (propertyName === 'toString') {
+        return {
+          call: (): RuntimeValue => ({
+            type: 'string',
+            value: this.renderInstanceValue(object),
+          }),
+          name: `${object.classValue.name}.toString`,
+          type: 'native-function',
         };
       }
 
@@ -929,6 +1004,17 @@ export class Interpreter {
           receiver: object,
           superClass: method.owner.baseClass,
           type: 'bound-method',
+        };
+      }
+
+      if (propertyName === 'toString') {
+        return {
+          call: (): RuntimeValue => ({
+            type: 'string',
+            value: this.renderClassValue(object),
+          }),
+          name: `${object.name}.toString`,
+          type: 'native-function',
         };
       }
 
@@ -1132,6 +1218,7 @@ export class Interpreter {
         name: statement.identifier.name,
         parameters: statement.parameters,
         returnType: statement.returnType,
+        typeParameters: statement.typeParameters,
         type: 'function',
       },
       false
@@ -1233,6 +1320,66 @@ export class Interpreter {
     return lastValue;
   }
 
+  private renderClassValue(classValue: ClassValue): string {
+    const declarationKind = classValue.virtual
+      ? 'abstract virtual class'
+      : classValue.abstract
+        ? 'abstract class'
+        : 'class';
+
+    return `${declarationKind} ${classValue.name} { ... }`;
+  }
+
+  private renderInstanceValue(instance: InstanceValue): string {
+    const explicitToString = findInstanceMethod(instance.classValue, 'toString');
+
+    if (explicitToString !== undefined) {
+      const result = this.callBoundMethod(
+        {
+          method: explicitToString.method,
+          receiver: instance,
+          superClass: explicitToString.owner.baseClass,
+          type: 'bound-method',
+        },
+        []
+      );
+
+      if (result.type !== 'string') {
+        throw createTypeError(`Method '${instance.classValue.name}.toString' must return a string`);
+      }
+
+      return result.value;
+    }
+
+    const fields = [...instance.fields.entries()].map(
+      ([name, binding]) => `${name}: ${this.runtimeValueToString(binding.value)}`
+    );
+
+    return `${instance.classValue.name} { ${fields.join(', ')} }`;
+  }
+
+  private renderUserFunctionValue(functionValue: UserFunctionValue): string {
+    const typeParameters =
+      functionValue.typeParameters.length === 0
+        ? ''
+        : `<${functionValue.typeParameters
+            .map((typeParameter) =>
+              typeParameter.defaultType === undefined
+                ? typeParameter.identifier.name
+                : `${typeParameter.identifier.name} = ${typeParameter.defaultType}`
+            )
+            .join(', ')}>`;
+    const parameters = functionValue.parameters
+      .map((parameter) => {
+        const rest = parameter.rest ? '...' : '';
+        const defaultValue = parameter.defaultValue === undefined ? '' : ' = ...';
+        return `${rest}${parameter.identifier.name}: ${parameter.typeAnnotation}${defaultValue}`;
+      })
+      .join(', ');
+
+    return `function ${functionValue.name}${typeParameters}(${parameters}): ${functionValue.returnType} { ... }`;
+  }
+
   private resolveBaseClass(statement: ClassDeclaration): ClassValue | undefined {
     if (statement.baseClass === undefined) {
       return undefined;
@@ -1256,13 +1403,13 @@ export class Interpreter {
       case 'boolean':
         return String(value.value);
       case 'class':
-        return `<class ${value.name}>`;
+        return this.renderClassValue(value);
       case 'instance':
-        return `<${value.classValue.name} instance>`;
+        return this.renderInstanceValue(value);
       case 'native-function':
         return `<native function ${value.name}>`;
       case 'function':
-        return `<function ${value.name}>`;
+        return this.renderUserFunctionValue(value);
       case 'null':
         return 'null';
       case 'number':

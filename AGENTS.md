@@ -50,8 +50,11 @@ This file tracks working conventions for the `fast` language project so future c
 - Functions and classes can declare generics with defaults, like `<T, K = string>`.
 - Function return values must match the declared return type.
 - Functions that do not return a value use `void`, like `function name(): void { ... }`.
+- Named functions expose implicit `name` and `toString()`, like `logGenericText.name` and `logGenericText.toString()`.
 - Classes use `class Name { ... }`.
 - Generic classes use `class Name<T, K = string> { ... }`.
+- Every class has an implicit static `name: string`, accessible like `BaseName.name` or `this.constructor.name`.
+- Every class has an implicit `toString(): string`; instances can override it, and `print(instance)` uses it automatically.
 - Abstract virtual contracts use `abstract virtual class Name { ... }`.
 - Classes can extend one base class with `extends` and implement abstract virtual contracts with `implements`.
 - Class members must include an explicit access modifier: `public`, `protected`, or `private`.

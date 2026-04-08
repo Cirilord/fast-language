@@ -2,7 +2,7 @@ import { createSyntaxError } from './errors';
 import { type Token, TokenType } from './token';
 import { Char } from './utils/char';
 
-const KEYWORDS: Record<string, TokenType> = {
+const KEYWORDS: Record<string, TokenType> = Object.assign(Object.create(null), {
   abstract: TokenType.Abstract,
   class: TokenType.Class,
   constructor: TokenType.Constructor,
@@ -29,7 +29,7 @@ const KEYWORDS: Record<string, TokenType> = {
   var: TokenType.Var,
   virtual: TokenType.Virtual,
   while: TokenType.While,
-};
+});
 
 export class Lexer {
   private column = 1;

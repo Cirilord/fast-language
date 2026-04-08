@@ -611,6 +611,33 @@ export class SemanticAnalyzer {
 
   private analyzeCallExpression(expression: CallExpression): SemanticType {
     if (expression.callee.kind === 'MemberExpression') {
+      const calleeObjectType = this.analyzeExpression(expression.callee.object);
+
+      if (calleeObjectType === 'function') {
+        if (expression.callee.property.name === 'name') {
+          throw createTypeError(
+            `Member '${expression.callee.property.name}' is not callable`,
+            expression.callee.property.location
+          );
+        }
+
+        if (expression.callee.property.name === 'toString') {
+          if (expression.arguments.length !== 0) {
+            throw createTypeError(
+              `'${expression.callee.property.name}' expects 0 arguments, got ${expression.arguments.length}`,
+              expression.callee.property.location
+            );
+          }
+
+          return 'string';
+        }
+
+        throw createReferenceError(
+          `Member '${expression.callee.property.name}' is not defined`,
+          expression.callee.property.location
+        );
+      }
+
       const resolved = this.resolveMemberExpression(expression.callee);
 
       if (resolved.member.kind !== 'ClassMethod') {
@@ -732,6 +759,19 @@ export class SemanticAnalyzer {
   }
 
   private analyzeClassDeclaration(statement: ClassDeclaration): void {
+    for (const member of statement.members) {
+      if (
+        (member.kind === 'ClassMethod' || member.kind === 'ClassProperty') &&
+        member.static &&
+        member.name.name === 'name'
+      ) {
+        throw createTypeError(
+          `Class '${statement.identifier.name}' cannot declare static member 'name' because it is reserved`,
+          member.name.location
+        );
+      }
+    }
+
     this.scope.define(
       {
         callable: false,
@@ -822,6 +862,22 @@ export class SemanticAnalyzer {
         }
 
         this.analyzeDefaultParameters(member.parameters, member.name.name);
+
+        if (member.name.name === 'toString') {
+          if (member.parameters.length > 0) {
+            throw createTypeError(
+              `Method 'toString' in '${statement.identifier.name}' cannot accept parameters`,
+              member.name.location
+            );
+          }
+
+          if (member.returnType !== 'string') {
+            throw createTypeError(
+              `Method 'toString' in '${statement.identifier.name}' must return 'string'`,
+              member.name.location
+            );
+          }
+        }
 
         if (member.body === undefined) {
           if (!statement.virtual && !member.virtual) {
@@ -1171,10 +1227,27 @@ export class SemanticAnalyzer {
   }
 
   private analyzeMemberExpression(expression: MemberExpression): SemanticType {
+    const objectType = this.analyzeExpression(expression.object);
+
+    if (expression.property.name === 'constructor' && objectType !== 'unknown') {
+      return objectType;
+    }
+
+    if (objectType === 'function') {
+      if (expression.property.name === 'name') {
+        return 'string';
+      }
+
+      if (expression.property.name === 'toString') {
+        return 'function';
+      }
+
+      throw createReferenceError(`Member '${expression.property.name}' is not defined`, expression.property.location);
+    }
+
     const resolved = this.resolveMemberExpression(expression);
 
     if (resolved.member.kind === 'ClassProperty') {
-      const objectType = this.analyzeExpression(expression.object);
       const typeArguments = this.resolveClassTypeArguments(resolved.owner, objectType, expression.property.location);
       return instantiateType(resolved.member.typeAnnotation, typeArguments);
     }
@@ -1737,6 +1810,26 @@ export class SemanticAnalyzer {
       };
     }
 
+    if (name === 'toString') {
+      return {
+        member: {
+          access: 'public',
+          kind: 'ClassMethod',
+          name: {
+            kind: 'Identifier',
+            location: statement.identifier.location,
+            name: 'toString',
+          },
+          override: false,
+          parameters: [],
+          returnType: 'string',
+          static: isStatic,
+          virtual: false,
+        },
+        owner: statement,
+      };
+    }
+
     if (statement.baseClass !== undefined) {
       return this.getMethod(this.getClassDeclaration(statement.baseClass), name, isStatic);
     }
@@ -1749,6 +1842,28 @@ export class SemanticAnalyzer {
   }
 
   private getProperty(statement: ClassDeclaration, name: string, isStatic: boolean): ResolvedClassMember | undefined {
+    if (isStatic && name === 'name') {
+      return {
+        member: {
+          access: 'public',
+          declarationType: 'val',
+          initializer: {
+            kind: 'StringLiteral',
+            value: statement.identifier.name,
+          },
+          kind: 'ClassProperty',
+          name: {
+            kind: 'Identifier',
+            location: statement.identifier.location,
+            name: 'name',
+          },
+          static: true,
+          typeAnnotation: 'string',
+        },
+        owner: statement,
+      };
+    }
+
     const property = statement.members.find(
       (member): member is ClassProperty =>
         member.kind === 'ClassProperty' && member.name.name === name && member.static === isStatic
@@ -1892,6 +2007,26 @@ export class SemanticAnalyzer {
         this.ensureMemberIsAccessible(member, expression.property.location);
         return member;
       }
+    }
+
+    if (expression.object.kind === 'MemberExpression' && expression.object.property.name === 'constructor') {
+      const objectType = this.analyzeExpression(expression.object);
+      const objectClass = this.getClassDeclaration({
+        kind: 'Identifier',
+        location: expression.property.location,
+        name: objectType,
+      });
+      const member = this.getMember(objectClass, expression.property.name, true);
+
+      if (member === undefined) {
+        throw createReferenceError(
+          `Static member '${expression.property.name}' is not defined`,
+          expression.property.location
+        );
+      }
+
+      this.ensureMemberIsAccessible(member, expression.property.location);
+      return member;
     }
 
     const objectType = this.analyzeExpression(expression.object);

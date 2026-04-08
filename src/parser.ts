@@ -231,7 +231,14 @@ export class Parser {
 
     while (true) {
       if (this.match(TokenType.Dot)) {
-        const property = this.consume(TokenType.Identifier, "Expected property name after '.'.");
+        let property: Token;
+
+        if (this.match(TokenType.Identifier, TokenType.Constructor)) {
+          property = this.previous();
+        } else {
+          throw this.error(this.peek(), "Expected property name after '.'.");
+        }
+
         expression = {
           kind: 'MemberExpression',
           object: expression,

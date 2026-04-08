@@ -17,11 +17,14 @@ Right now the project is implemented in TypeScript and already supports:
 - rest parameters with typed arrays like `...items: string[]`
 - generic functions and classes with type parameters like `<T, K = string>`
 - `void` functions with `function name(): void { ... }`
+- named functions expose implicit `name` and `toString()`, and `print(functionName)` uses the function string representation
 - classes with mandatory access modifiers and `var`/`val` property mutability
 - `abstract virtual class` contracts with `implements`
 - semantic checks for class member access, inherited overrides, virtual methods, and constructor visibility
 - object instantiation with `new ClassName()`
 - member access with `.`, including `this`, `super`, and static members
+- every class exposes an implicit static `name`, and instances can access it through `this.constructor.name`
+- classes expose an implicit `toString()`, instances can override `toString(): string`, and `print(instance)` uses it automatically
 - named imports with `import { name } from "./file";`
 - named exports with `export var`, `export val`, `export function`, and `export name;`
 - typed numeric declarations like `var count: int = 10;`
@@ -106,6 +109,7 @@ class BaseName {
 
   protected sayBase(): void {
     print(this.name);
+    print(this.constructor.name);
   }
 }
 
@@ -125,6 +129,10 @@ class User extends BaseName implements Printable {
   public override printName(): void {
     print(this.displayName);
     super.sayBase();
+  }
+
+  public override toString(): string {
+    return this.displayName;
   }
 }
 
@@ -190,10 +198,17 @@ print(fallbackText);
 print(status);
 print(computedStatus);
 print(genericStatus);
+print(logGenericText);
+print(logGenericText.name);
+print(logGenericText.toString());
 print(importedStatus);
 print(importedText);
 print(profile);
 print(box.getValue());
+print(BaseName.name);
+print(BaseName.toString());
+print(user.toString());
+print(user);
 user.printName();
 User.showLabel();
 logStatus();
@@ -303,6 +318,7 @@ Then open a `.fast` file in the extension development window.
 - parameters can use default values like `label: string = "status"`
 - function return values must match the declared return type
 - functions that do not return a value use `void`, like `function name(): void { ... }`
+- named functions expose implicit `name` and `toString()`, like `logGenericText.name` and `logGenericText.toString()`
 - classes use `class Name { ... }`
 - abstract virtual contracts use `abstract virtual class Name { ... }`
 - classes can extend one base class with `extends` and implement abstract virtual contracts with `implements`
