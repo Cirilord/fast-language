@@ -15,6 +15,10 @@ Right now the project is implemented in TypeScript and already supports:
 - logical assignment operators with `&&=`, `||=`, and `??=`
 - function declarations with `function name(): type { return value; }`
 - `void` functions with `function name(): void { ... }`
+- classes with mandatory access modifiers and `var`/`val` property mutability
+- `abstract virtual class` contracts with `implements`
+- object instantiation with `new ClassName()`
+- member access with `.`, including `this`, `super`, and static members
 - named imports with `import { name } from "./file";`
 - named exports with `export var`, `export val`, `export function`, and `export name;`
 - typed numeric declarations like `var count: int = 10;`
@@ -69,7 +73,41 @@ function logStatus(): void {
   return;
 }
 
+abstract virtual class Printable {
+  public printName(): void;
+}
+
+class BaseName {
+  protected val name: string = "base";
+
+  public constructor() {}
+
+  protected sayBase(): void {
+    print(this.name);
+  }
+}
+
+class User extends BaseName implements Printable {
+  public static val label: string = "User";
+  public var displayName: string = "Fast";
+
+  public constructor(displayName: string) {
+    super();
+    this.displayName = displayName;
+  }
+
+  public static showLabel(): void {
+    print(User.label);
+  }
+
+  public override printName(): void {
+    print(this.displayName);
+    super.sayBase();
+  }
+}
+
 val computedStatus: string = getStatus();
+var user: User = new User("Fast object");
 
 x += 5;
 x -= 2;
@@ -113,6 +151,8 @@ print(fallbackText);
 print(status);
 print(computedStatus);
 print(importedText);
+user.printName();
+User.showLabel();
 logStatus();
 logImportedText();
 ```
@@ -199,7 +239,7 @@ Then open a `.fast` file in the extension development window.
 - numeric variable types are `int`, `float`, and `double`
 - variable declarations can include a type annotation, like `var name: string = "Fast";`
 - variable declarations can infer type from non-null initializers, like `var name = "Fast";`
-- accepted variable types are `array`, `boolean`, `double`, `float`, `int`, and `string`
+- accepted variable types include `array`, `boolean`, `double`, `float`, `int`, `string`, and declared class names
 - `null` declarations require an explicit declared type, like `var name: string = null;`
 - named imports use `import { name } from "./file";` and resolve local `.fast` files
 - named exports can be inline, like `export var name = "Fast";`
@@ -213,9 +253,21 @@ Then open a `.fast` file in the extension development window.
 - `for` loops can access index with `for (var element, index of array) { ... }`
 - `while` loops use `while (condition) { ... }` and the condition must be boolean
 - `do while` loops use `do { ... } while (condition);` and the condition must be boolean
-- functions use `function name(): type { return value; }`
+- functions use `function name(parameter: type): type { return value; }`
 - function return values must match the declared return type
 - functions that do not return a value use `void`, like `function name(): void { ... }`
+- classes use `class Name { ... }`
+- abstract virtual contracts use `abstract virtual class Name { ... }`
+- classes can extend one base class with `extends` and implement abstract virtual contracts with `implements`
+- class members require `public`, `protected`, or `private`
+- class properties require `var` or `val`, like `public var name: string = "Fast";`
+- `static` comes after the access modifier and before `var`/`val`, like `public static val label: string = "User";`
+- constructors use `public constructor(parameter: type) { ... }`
+- methods use return annotations and can accept parameters, like `public name(prefix: string): string { ... }`
+- abstract virtual class methods use signatures without bodies, like `public print(): void;`
+- implemented contract methods use `override`, like `public override print(): void { ... }`
+- objects are created with `new Name()` and members are accessed with `.`
+- `this` is available in constructors and methods, and `super()`/`super.method()` are available in subclasses
 - `print` is treated as an identifier in the lexer and as a builtin at runtime
 - symbol existence, callability, and `val` reassignment are checked semantically before execution
 

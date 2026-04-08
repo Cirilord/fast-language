@@ -32,7 +32,41 @@ function logStatus(): void {
   return;
 }
 
+abstract virtual class Printable {
+  public printName(): void;
+}
+
+class BaseName {
+  protected val name: string = "base";
+
+  public constructor() {}
+
+  protected sayBase(): void {
+    print(this.name);
+  }
+}
+
+class User extends BaseName implements Printable {
+  public static val label: string = "User";
+  public var displayName: string = "Fast";
+
+  public constructor(displayName: string) {
+    super();
+    this.displayName = displayName;
+  }
+
+  public static showLabel(): void {
+    print(User.label);
+  }
+
+  public override printName(): void {
+    print(this.displayName);
+    super.sayBase();
+  }
+}
+
 val computedStatus: string = getStatus();
+var user: User = new User("Fast object");
 
 x += 5;
 x -= 2;
@@ -80,5 +114,7 @@ print(fallbackText);
 print(status);
 print(computedStatus);
 print(importedText);
+user.printName();
+User.showLabel();
 logStatus();
 logImportedText();

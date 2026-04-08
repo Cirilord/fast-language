@@ -32,7 +32,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Integer literals do not use decimal points, like `10`; decimal literals use decimal points, like `20.0`.
 - Variable declarations can include a type annotation, like `var name: string = "Fast";`.
 - Variable declarations can infer type from non-null initializers, like `var name = "Fast";`.
-- Accepted variable types are `array`, `boolean`, `double`, `float`, `int`, and `string`.
+- Accepted variable types include `array`, `boolean`, `double`, `float`, `int`, `string`, and declared class names.
 - `null` declarations require an explicit declared type, like `var name: string = null;`.
 - `print` is not a lexer keyword; it is tokenized as `IDENTIFIER`.
 - Normal strings use `"`.
@@ -43,9 +43,21 @@ This file tracks working conventions for the `fast` language project so future c
 - `for` loops can access index with `for (var element, index of array) { ... }`.
 - `while` loops use `while (condition) { ... }`, and the condition must be boolean.
 - `do while` loops use `do { ... } while (condition);`, and the condition must be boolean.
-- Functions currently use `function name(): type { return value; }` without parameters.
+- Functions use `function name(parameter: type): type { return value; }`.
 - Function return values must match the declared return type.
 - Functions that do not return a value use `void`, like `function name(): void { ... }`.
+- Classes use `class Name { ... }`.
+- Abstract virtual contracts use `abstract virtual class Name { ... }`.
+- Classes can extend one base class with `extends` and implement abstract virtual contracts with `implements`.
+- Class members must include an explicit access modifier: `public`, `protected`, or `private`.
+- Class properties require `var` or `val` to define mutability, like `public var name: string = "Fast";`.
+- `static` comes after the access modifier and before `var`/`val`, like `public static val label: string = "User";`.
+- Constructors use `public constructor(parameter: type) { ... }`.
+- Methods require return annotations and can accept parameters, like `public name(prefix: string): string { ... }`.
+- Abstract virtual class methods use signatures without bodies, like `public print(): void;`.
+- Implemented contract methods use `override`, like `public override print(): void { ... }`.
+- Objects are created with `new Name()` and members are accessed with `.`.
+- `this` is available in constructors and methods, and `super()`/`super.method()` are available in subclasses.
 - Named imports use `import { name } from "./file";` and resolve local `.fast` files.
 - Named exports can be inline, like `export var name = "Fast";`.
 - Named exports can reference existing bindings, like `export name;`.

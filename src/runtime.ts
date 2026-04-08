@@ -5,6 +5,10 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  ClassConstructor,
+  ClassDeclaration,
+  ClassMethod,
+  ClassProperty,
   ConditionalExpression,
   DoWhileStatement,
   ExportDeclaration,
@@ -14,8 +18,11 @@ import type {
   FunctionReturnType,
   Identifier,
   ImportDeclaration,
+  MemberExpression,
+  NewExpression,
   NumberLiteral,
   NumberLiteralType,
+  Parameter,
   Program,
   ReturnStatement,
   Statement,
@@ -49,6 +56,38 @@ export type NativeFunctionValue = {
   type: 'native-function';
 };
 
+export type ClassValue = {
+  abstract: boolean;
+  baseClass?: ClassValue;
+  constructorMember?: ClassConstructor;
+  instanceMethods: Map<string, ClassMethod>;
+  instanceProperties: ClassProperty[];
+  name: string;
+  staticMethods: Map<string, ClassMethod>;
+  staticProperties: Map<string, Binding>;
+  type: 'class';
+  virtual: boolean;
+};
+
+export type InstanceValue = {
+  classValue: ClassValue;
+  fields: Map<string, Binding>;
+  type: 'instance';
+};
+
+export type BoundMethodValue = {
+  method: ClassMethod;
+  receiver: ClassValue | InstanceValue;
+  superClass: ClassValue | undefined;
+  type: 'bound-method';
+};
+
+export type SuperValue = {
+  receiver: InstanceValue;
+  superClass: ClassValue;
+  type: 'super';
+};
+
 export type NullValue = {
   type: 'null';
   value: null;
@@ -69,17 +108,22 @@ export type UserFunctionValue = {
   body: Statement[];
   closure: Scope;
   name: string;
+  parameters: Parameter[];
   returnType: FunctionReturnType;
   type: 'function';
 };
 
 export type RuntimeValue =
   | ArrayValue
+  | BoundMethodValue
   | BooleanValue
+  | ClassValue
+  | InstanceValue
   | NativeFunctionValue
   | NullValue
   | NumberValue
   | StringValue
+  | SuperValue
   | UserFunctionValue;
 
 export type RuntimeModuleExports = ReadonlyMap<string, RuntimeValue>;
@@ -118,8 +162,14 @@ function areRuntimeValuesEqual(left: RuntimeValue, right: RuntimeValue): boolean
   switch (left.type) {
     case 'array':
       return left === right;
+    case 'bound-method':
+      return left === right;
     case 'boolean':
       return right.type === 'boolean' && left.value === right.value;
+    case 'class':
+      return left === right;
+    case 'instance':
+      return left === right;
     case 'native-function':
       return left === right;
     case 'function':
@@ -130,6 +180,8 @@ function areRuntimeValuesEqual(left: RuntimeValue, right: RuntimeValue): boolean
       return right.type === 'number' && left.value === right.value;
     case 'string':
       return right.type === 'string' && left.value === right.value;
+    case 'super':
+      return left === right;
   }
 }
 
@@ -256,6 +308,45 @@ function evaluateCompoundAssignment(
   }
 }
 
+function findInstanceMethod(
+  classValue: ClassValue,
+  name: string
+): { method: ClassMethod; owner: ClassValue } | undefined {
+  const method = classValue.instanceMethods.get(name);
+
+  if (method !== undefined) {
+    return { method, owner: classValue };
+  }
+
+  if (classValue.baseClass !== undefined) {
+    return findInstanceMethod(classValue.baseClass, name);
+  }
+
+  return undefined;
+}
+
+function findStaticMethod(
+  classValue: ClassValue,
+  name: string
+): { method: ClassMethod; owner: ClassValue } | undefined {
+  const method = classValue.staticMethods.get(name);
+
+  if (method !== undefined) {
+    return { method, owner: classValue };
+  }
+
+  if (classValue.baseClass !== undefined) {
+    return findStaticMethod(classValue.baseClass, name);
+  }
+
+  return undefined;
+}
+
+function getClassChain(classValue: ClassValue): ClassValue[] {
+  const baseChain = classValue.baseClass === undefined ? [] : getClassChain(classValue.baseClass);
+  return [...baseChain, classValue];
+}
+
 export class Interpreter {
   private readonly exports = new Map<string, RuntimeValue>();
   private scope = new Scope();
@@ -291,9 +382,147 @@ export class Interpreter {
     return this.exports;
   }
 
-  private callUserFunction(callee: UserFunctionValue): RuntimeValue {
+  private assertArgumentCount(name: string, expected: number, actual: number): void {
+    if (actual !== expected) {
+      throw createTypeError(`'${name}' expects ${expected} arguments, got ${actual}`);
+    }
+  }
+
+  private assignMember(expression: MemberExpression, value: RuntimeValue): RuntimeValue {
+    const object = this.evaluateExpression(expression.object);
+
+    if (object.type === 'instance') {
+      const binding = object.fields.get(expression.property.name);
+
+      if (binding === undefined) {
+        throw createReferenceError(`Property '${expression.property.name}' is not defined`);
+      }
+
+      if (!binding.mutable) {
+        throw createTypeError(`Cannot reassign immutable property '${expression.property.name}'`);
+      }
+
+      binding.value = coerceValueToBindingType(value, binding.typeAnnotation);
+      return binding.value;
+    }
+
+    if (object.type === 'class') {
+      const binding = object.staticProperties.get(expression.property.name);
+
+      if (binding === undefined) {
+        throw createReferenceError(`Static property '${expression.property.name}' is not defined`);
+      }
+
+      if (!binding.mutable) {
+        throw createTypeError(`Cannot reassign immutable static property '${expression.property.name}'`);
+      }
+
+      binding.value = coerceValueToBindingType(value, binding.typeAnnotation);
+      return binding.value;
+    }
+
+    throw createTypeError(`Cannot assign property '${expression.property.name}' on '${object.type}'`);
+  }
+
+  private bindParameters(parameters: Parameter[], args: RuntimeValue[]): void {
+    for (const [index, parameter] of parameters.entries()) {
+      const arg = args[index];
+
+      if (arg === undefined) {
+        throw createTypeError(`Missing argument for parameter '${parameter.identifier.name}'`);
+      }
+
+      this.scope.define(parameter.identifier.name, arg, false, parameter.typeAnnotation);
+    }
+  }
+
+  private callBoundMethod(callee: BoundMethodValue, args: RuntimeValue[]): RuntimeValue {
+    this.assertArgumentCount(callee.method.name.name, callee.method.parameters.length, args.length);
+    const parentScope = this.scope;
+
+    try {
+      this.scope = new Scope(parentScope);
+      this.scope.define('this', callee.receiver, false);
+      this.bindParameters(callee.method.parameters, args);
+
+      if (callee.receiver.type === 'instance' && callee.superClass !== undefined) {
+        this.scope.define(
+          'super',
+          {
+            receiver: callee.receiver,
+            superClass: callee.superClass,
+            type: 'super',
+          },
+          false
+        );
+      }
+
+      let lastValue: RuntimeValue = { type: 'null', value: null };
+
+      for (const bodyStatement of callee.method.body ?? []) {
+        lastValue = this.executeStatement(bodyStatement);
+      }
+
+      return lastValue;
+    } catch (error) {
+      if (error instanceof ReturnSignal) {
+        return error.value;
+      }
+
+      throw error;
+    } finally {
+      this.scope = parentScope;
+    }
+  }
+
+  private callConstructor(classValue: ClassValue, instance: InstanceValue, args: RuntimeValue[]): RuntimeValue {
+    if (classValue.constructorMember === undefined) {
+      if (classValue.baseClass !== undefined) {
+        this.callConstructor(classValue.baseClass, instance, []);
+      }
+
+      return { type: 'null', value: null };
+    }
+
+    this.assertArgumentCount(classValue.name, classValue.constructorMember.parameters.length, args.length);
+    const previousScope = this.scope;
+
+    try {
+      this.scope = new Scope(previousScope);
+      this.scope.define('this', instance, false);
+      this.bindParameters(classValue.constructorMember.parameters, args);
+
+      if (classValue.baseClass !== undefined) {
+        this.scope.define(
+          'super',
+          {
+            receiver: instance,
+            superClass: classValue.baseClass,
+            type: 'super',
+          },
+          false
+        );
+      }
+
+      let lastValue: RuntimeValue = { type: 'null', value: null };
+
+      for (const bodyStatement of classValue.constructorMember.body) {
+        lastValue = this.executeStatement(bodyStatement);
+      }
+
+      return lastValue;
+    } finally {
+      this.scope = previousScope;
+    }
+  }
+
+  private callUserFunction(callee: UserFunctionValue, args: RuntimeValue[]): RuntimeValue {
+    this.assertArgumentCount(callee.name, callee.parameters.length, args.length);
+
     try {
       return this.withScopeFrom(callee.closure, () => {
+        this.bindParameters(callee.parameters, args);
+
         let lastValue: RuntimeValue = { type: 'null', value: null };
 
         for (const bodyStatement of callee.body) {
@@ -311,6 +540,66 @@ export class Interpreter {
     }
   }
 
+  private createClassValue(statement: ClassDeclaration): ClassValue {
+    const staticMethods = new Map<string, ClassMethod>();
+    const staticProperties = new Map<string, Binding>();
+    const instanceMethods = new Map<string, ClassMethod>();
+    const instanceProperties: ClassProperty[] = [];
+    let constructorMember: ClassConstructor | undefined;
+    const baseClass = this.resolveBaseClass(statement);
+
+    for (const member of statement.members) {
+      if (member.kind === 'ClassConstructor') {
+        constructorMember = member;
+        continue;
+      }
+
+      if (member.kind === 'ClassMethod') {
+        if (member.body === undefined) {
+          continue;
+        }
+
+        if (member.static) {
+          staticMethods.set(member.name.name, member);
+        } else {
+          instanceMethods.set(member.name.name, member);
+        }
+        continue;
+      }
+
+      if (member.static) {
+        staticProperties.set(member.name.name, {
+          mutable: member.declarationType === 'var',
+          typeAnnotation: member.typeAnnotation,
+          value: coerceValueToBindingType(this.evaluateExpression(member.initializer), member.typeAnnotation),
+        });
+      } else {
+        instanceProperties.push(member);
+      }
+    }
+
+    const classValue: ClassValue = {
+      abstract: statement.abstract,
+      instanceMethods,
+      instanceProperties,
+      name: statement.identifier.name,
+      staticMethods,
+      staticProperties,
+      type: 'class',
+      virtual: statement.virtual,
+    };
+
+    if (baseClass !== undefined) {
+      classValue.baseClass = baseClass;
+    }
+
+    if (constructorMember !== undefined) {
+      classValue.constructorMember = constructorMember;
+    }
+
+    return classValue;
+  }
+
   private evaluateArrayLiteral(expression: ArrayLiteral): RuntimeValue {
     return {
       elements: expression.elements.map((element) => this.evaluateExpression(element)),
@@ -323,7 +612,10 @@ export class Interpreter {
       return this.evaluateExpression(statement.value);
     }
 
-    const current = this.scope.lookup(statement.identifier.name);
+    const current =
+      statement.target.kind === 'Identifier'
+        ? this.scope.lookup(statement.target.name)
+        : this.evaluateExpression(statement.target);
 
     if (statement.operator === '??=') {
       return current.type === 'null' ? this.evaluateExpression(statement.value) : current;
@@ -456,23 +748,30 @@ export class Interpreter {
   }
 
   private evaluateCallExpression(expression: CallExpression): RuntimeValue {
-    const callee = this.scope.lookup(expression.callee.name);
-
-    const args = expression.arguments.map((arg) => this.evaluateExpression(arg));
+    const callee = this.evaluateExpression(expression.callee);
+    const calleeName = expression.callee.kind === 'Identifier' ? expression.callee.name : '<expression>';
 
     if (callee.type === 'native-function') {
+      const args = expression.arguments.map((arg) => this.evaluateExpression(arg));
       return callee.call(args);
     }
 
     if (callee.type === 'function') {
-      if (args.length !== 0) {
-        throw createTypeError(`Function '${callee.name}' expects 0 arguments, got ${args.length}`);
-      }
-
-      return this.callUserFunction(callee);
+      const args = expression.arguments.map((arg) => this.evaluateExpression(arg));
+      return this.callUserFunction(callee, args);
     }
 
-    throw createTypeError(`Binding '${expression.callee.name}' is not callable`);
+    if (callee.type === 'bound-method') {
+      const args = expression.arguments.map((arg) => this.evaluateExpression(arg));
+      return this.callBoundMethod(callee, args);
+    }
+
+    if (callee.type === 'super') {
+      const args = expression.arguments.map((arg) => this.evaluateExpression(arg));
+      return this.callConstructor(callee.superClass, callee.receiver, args);
+    }
+
+    throw createTypeError(`Binding '${calleeName}' is not callable`);
   }
 
   private evaluateConditionalExpression(expression: ConditionalExpression): RuntimeValue {
@@ -497,12 +796,20 @@ export class Interpreter {
         return this.evaluateConditionalExpression(expression);
       case 'Identifier':
         return this.evaluateIdentifier(expression);
+      case 'MemberExpression':
+        return this.evaluateMemberExpression(expression);
+      case 'NewExpression':
+        return this.evaluateNewExpression(expression);
       case 'NumberLiteral':
         return this.evaluateNumberLiteral(expression);
       case 'NullLiteral':
         return this.evaluateNullLiteral();
       case 'StringLiteral':
         return this.evaluateStringLiteral(expression);
+      case 'SuperExpression':
+        return this.scope.lookup('super');
+      case 'ThisExpression':
+        return this.scope.lookup('this');
       case 'UnaryExpression':
         return this.evaluateUnaryExpression(expression);
     }
@@ -510,6 +817,109 @@ export class Interpreter {
 
   private evaluateIdentifier(expression: Identifier): RuntimeValue {
     return this.scope.lookup(expression.name);
+  }
+
+  private evaluateMemberExpression(expression: MemberExpression): RuntimeValue {
+    const object = this.evaluateExpression(expression.object);
+    const propertyName = expression.property.name;
+
+    if (object.type === 'instance') {
+      const field = object.fields.get(propertyName);
+
+      if (field !== undefined) {
+        return field.value;
+      }
+
+      const method = findInstanceMethod(object.classValue, propertyName);
+
+      if (method !== undefined) {
+        return {
+          method: method.method,
+          receiver: object,
+          superClass: method.owner.baseClass,
+          type: 'bound-method',
+        };
+      }
+
+      throw createReferenceError(`Property '${propertyName}' is not defined`);
+    }
+
+    if (object.type === 'class') {
+      const property = object.staticProperties.get(propertyName);
+
+      if (property !== undefined) {
+        return property.value;
+      }
+
+      const method = findStaticMethod(object, propertyName);
+
+      if (method !== undefined) {
+        return {
+          method: method.method,
+          receiver: object,
+          superClass: method.owner.baseClass,
+          type: 'bound-method',
+        };
+      }
+
+      throw createReferenceError(`Static property '${propertyName}' is not defined`);
+    }
+
+    if (object.type === 'super') {
+      const method = findInstanceMethod(object.superClass, propertyName);
+
+      if (method !== undefined) {
+        return {
+          method: method.method,
+          receiver: object.receiver,
+          superClass: method.owner.baseClass,
+          type: 'bound-method',
+        };
+      }
+
+      const property = object.receiver.fields.get(propertyName);
+
+      if (property !== undefined) {
+        return property.value;
+      }
+
+      throw createReferenceError(`Super property '${propertyName}' is not defined`);
+    }
+
+    throw createTypeError(`Cannot read property '${propertyName}' from '${object.type}'`);
+  }
+
+  private evaluateNewExpression(expression: NewExpression): RuntimeValue {
+    const classValue = this.scope.lookup(expression.callee.name);
+
+    if (classValue.type !== 'class') {
+      throw createTypeError(`Binding '${expression.callee.name}' is not a class`);
+    }
+
+    if (classValue.abstract || classValue.virtual) {
+      throw createTypeError(`Cannot instantiate abstract class '${classValue.name}'`);
+    }
+
+    const args = expression.arguments.map((arg) => this.evaluateExpression(arg));
+
+    const instance: InstanceValue = {
+      classValue,
+      fields: new Map(),
+      type: 'instance',
+    };
+
+    for (const item of getClassChain(classValue)) {
+      for (const property of item.instanceProperties) {
+        instance.fields.set(property.name.name, {
+          mutable: property.declarationType === 'var',
+          typeAnnotation: property.typeAnnotation,
+          value: coerceValueToBindingType(this.evaluateExpression(property.initializer), property.typeAnnotation),
+        });
+      }
+    }
+
+    this.callConstructor(classValue, instance, args);
+    return instance;
   }
 
   private evaluateNullLiteral(): RuntimeValue {
@@ -550,7 +960,17 @@ export class Interpreter {
 
   private executeAssignmentStatement(statement: AssignmentStatement): RuntimeValue {
     const value = this.evaluateAssignmentValue(statement);
-    return this.scope.assign(statement.identifier.name, value);
+
+    if (statement.target.kind === 'MemberExpression') {
+      return this.assignMember(statement.target, value);
+    }
+
+    return this.scope.assign(statement.target.name, value);
+  }
+
+  private executeClassDeclaration(statement: ClassDeclaration): RuntimeValue {
+    const classValue = this.createClassValue(statement);
+    return this.scope.define(statement.identifier.name, classValue, false);
   }
 
   private executeDoWhileStatement(statement: DoWhileStatement): RuntimeValue {
@@ -633,6 +1053,7 @@ export class Interpreter {
         body: statement.body,
         closure: this.scope,
         name: statement.identifier.name,
+        parameters: statement.parameters,
         returnType: statement.returnType,
         type: 'function',
       },
@@ -673,6 +1094,8 @@ export class Interpreter {
     switch (statement.kind) {
       case 'AssignmentStatement':
         return this.executeAssignmentStatement(statement);
+      case 'ClassDeclaration':
+        return this.executeClassDeclaration(statement);
       case 'DoWhileStatement':
         return this.executeDoWhileStatement(statement);
       case 'ExportDeclaration':
@@ -733,12 +1156,32 @@ export class Interpreter {
     return lastValue;
   }
 
+  private resolveBaseClass(statement: ClassDeclaration): ClassValue | undefined {
+    if (statement.baseClass === undefined) {
+      return undefined;
+    }
+
+    const baseClass = this.scope.lookup(statement.baseClass.name);
+
+    if (baseClass.type !== 'class') {
+      throw createTypeError(`Binding '${statement.baseClass.name}' is not a class`);
+    }
+
+    return baseClass;
+  }
+
   private runtimeValueToString(value: RuntimeValue): string {
     switch (value.type) {
       case 'array':
         return `[${value.elements.map((element) => this.runtimeValueToString(element)).join(', ')}]`;
+      case 'bound-method':
+        return '<bound method>';
       case 'boolean':
         return String(value.value);
+      case 'class':
+        return `<class ${value.name}>`;
+      case 'instance':
+        return `<${value.classValue.name} instance>`;
       case 'native-function':
         return `<native function ${value.name}>`;
       case 'function':
@@ -749,6 +1192,8 @@ export class Interpreter {
         return String(value.value);
       case 'string':
         return value.value;
+      case 'super':
+        return '<super>';
     }
   }
 

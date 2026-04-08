@@ -5,6 +5,8 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  ClassDeclaration,
+  ClassMethod,
   ConditionalExpression,
   DoWhileStatement,
   ExportDeclaration,
@@ -15,8 +17,11 @@ import type {
   FunctionReturnType,
   Identifier,
   ImportDeclaration,
+  MemberExpression,
+  NewExpression,
   NumberLiteral,
   NumberLiteralType,
+  Parameter,
   Program,
   ReturnStatement,
   Statement,
@@ -32,8 +37,10 @@ export type SemanticType = 'function' | 'null' | 'void' | TypeName | 'unknown';
 export type SemanticSymbol = {
   arity?: number;
   callable: boolean;
+  classDeclaration?: ClassDeclaration;
   mutable: boolean;
   name: string;
+  parameterTypes?: TypeName[];
   returnType?: SemanticType;
   type: SemanticType;
 };
@@ -166,6 +173,25 @@ export class SemanticAnalyzer {
     return this.exports;
   }
 
+  private analyzeArguments(args: Expression[], parameterTypes: TypeName[], calleeName: string): void {
+    if (args.length !== parameterTypes.length) {
+      throw createTypeError(`'${calleeName}' expects ${parameterTypes.length} arguments, got ${args.length}`);
+    }
+
+    for (const [index, arg] of args.entries()) {
+      const argType = this.analyzeExpression(arg);
+      const parameterType = parameterTypes[index];
+
+      if (parameterType === undefined) {
+        throw createTypeError(`Missing parameter type for argument ${index + 1} in '${calleeName}'`);
+      }
+
+      if (!areTypesCompatible(parameterType, argType)) {
+        throw createTypeError(`Argument ${index + 1} of '${calleeName}' expects '${parameterType}', got '${argType}'`);
+      }
+    }
+  }
+
   private analyzeArrayLiteral(expression: ArrayLiteral): SemanticType {
     for (const element of expression.elements) {
       this.analyzeExpression(element);
@@ -176,57 +202,57 @@ export class SemanticAnalyzer {
 
   private analyzeAssignmentStatement(statement: AssignmentStatement): void {
     const type = this.analyzeExpression(statement.value);
-    const symbol = this.scope.lookup(statement.identifier.name, statement.identifier.location);
+
+    if (statement.target.kind === 'MemberExpression') {
+      this.analyzeMemberExpression(statement.target);
+      return;
+    }
+
+    const symbol = this.scope.lookup(statement.target.name, statement.target.location);
 
     if (statement.operator === '=') {
       if (!areTypesCompatible(symbol.type, type)) {
         throw createTypeError(
-          `Cannot assign value of type '${type}' to binding '${statement.identifier.name}' of type '${symbol.type}'`,
-          statement.identifier.location
+          `Cannot assign value of type '${type}' to binding '${statement.target.name}' of type '${symbol.type}'`,
+          statement.target.location
         );
       }
 
-      this.scope.assign(statement.identifier.name, statement.identifier.location);
+      this.scope.assign(statement.target.name, statement.target.location);
       return;
     }
 
     if (statement.operator === '??=') {
       if (!areTypesCompatible(symbol.type, type)) {
         throw createTypeError(
-          `Cannot assign value of type '${type}' to binding '${statement.identifier.name}' of type '${symbol.type}'`,
-          statement.identifier.location
+          `Cannot assign value of type '${type}' to binding '${statement.target.name}' of type '${symbol.type}'`,
+          statement.target.location
         );
       }
 
-      this.scope.assign(statement.identifier.name, statement.identifier.location);
+      this.scope.assign(statement.target.name, statement.target.location);
       return;
     }
 
     if (statement.operator === '&&=' || statement.operator === '||=') {
       if (symbol.type !== 'boolean' || (type !== 'boolean' && type !== 'unknown')) {
-        throw createTypeError(
-          `Operator '${statement.operator}' expects boolean operands`,
-          statement.identifier.location
-        );
+        throw createTypeError(`Operator '${statement.operator}' expects boolean operands`, statement.target.location);
       }
 
-      this.scope.assign(statement.identifier.name, statement.identifier.location);
+      this.scope.assign(statement.target.name, statement.target.location);
       return;
     }
 
     if (!symbol.mutable) {
-      throw createTypeError(
-        `Cannot reassign immutable binding '${statement.identifier.name}'`,
-        statement.identifier.location
-      );
+      throw createTypeError(`Cannot reassign immutable binding '${statement.target.name}'`, statement.target.location);
     }
 
     if (!isNumericType(symbol.type) || !isNumericType(type)) {
-      throw createTypeError(`Operator '${statement.operator}' expects number operands`, statement.identifier.location);
+      throw createTypeError(`Operator '${statement.operator}' expects number operands`, statement.target.location);
     }
 
     toBinaryOperator(statement.operator);
-    this.scope.assign(statement.identifier.name, statement.identifier.location);
+    this.scope.assign(statement.target.name, statement.target.location);
   }
 
   private analyzeBinaryExpression(expression: BinaryExpression): SemanticType {
@@ -281,10 +307,25 @@ export class SemanticAnalyzer {
   }
 
   private analyzeCallExpression(expression: CallExpression): SemanticType {
+    if (expression.callee.kind !== 'Identifier') {
+      this.analyzeExpression(expression.callee);
+
+      for (const arg of expression.arguments) {
+        this.analyzeExpression(arg);
+      }
+
+      return 'unknown';
+    }
+
     const callee = this.scope.lookup(expression.callee.name, expression.callee.location);
 
     if (!callee.callable) {
       throw createTypeError(`Binding '${expression.callee.name}' is not callable`, expression.callee.location);
+    }
+
+    if (callee.parameterTypes !== undefined) {
+      this.analyzeArguments(expression.arguments, callee.parameterTypes, expression.callee.name);
+      return callee.returnType ?? 'unknown';
     }
 
     if (callee.arity !== undefined && expression.arguments.length !== callee.arity) {
@@ -297,8 +338,118 @@ export class SemanticAnalyzer {
     for (const arg of expression.arguments) {
       this.analyzeExpression(arg);
     }
-
     return callee.returnType ?? 'unknown';
+  }
+
+  private analyzeClassDeclaration(statement: ClassDeclaration): void {
+    this.scope.define(
+      {
+        callable: false,
+        classDeclaration: statement,
+        mutable: false,
+        name: statement.identifier.name,
+        type: statement.identifier.name,
+      },
+      statement.identifier.location
+    );
+
+    if (statement.virtual) {
+      for (const member of statement.members) {
+        if (member.kind !== 'ClassMethod' || member.body !== undefined) {
+          throw createTypeError(
+            `Abstract virtual class '${statement.identifier.name}' can only contain method signatures`,
+            statement.identifier.location
+          );
+        }
+      }
+    }
+
+    if (statement.baseClass !== undefined) {
+      const base = this.scope.lookup(statement.baseClass.name, statement.baseClass.location);
+
+      if (base.classDeclaration === undefined) {
+        throw createTypeError(
+          `Class '${statement.identifier.name}' can only extend classes`,
+          statement.baseClass.location
+        );
+      }
+    }
+
+    for (const implemented of statement.implements) {
+      const contract = this.scope.lookup(implemented.name, implemented.location);
+
+      if (contract.classDeclaration === undefined || !contract.classDeclaration.virtual) {
+        throw createTypeError(
+          `Class '${statement.identifier.name}' can only implement abstract virtual classes`,
+          implemented.location
+        );
+      }
+
+      this.ensureImplementsContract(statement, contract.classDeclaration);
+    }
+
+    this.ensureSingleConstructor(statement);
+    this.analyzeClassMembers(statement);
+  }
+
+  private analyzeClassMembers(statement: ClassDeclaration): void {
+    const previousReturnType = this.currentReturnType;
+
+    try {
+      for (const member of statement.members) {
+        if (member.kind === 'ClassProperty') {
+          const initializerType = this.analyzeExpression(member.initializer);
+
+          if (!areTypesCompatible(member.typeAnnotation, initializerType)) {
+            throw createTypeError(
+              `Cannot initialize property '${member.name.name}' of type '${member.typeAnnotation}' with value of type '${initializerType}'`,
+              member.name.location
+            );
+          }
+          continue;
+        }
+
+        if (member.kind === 'ClassConstructor') {
+          this.currentReturnType = 'void';
+          this.withScope(() => {
+            this.defineParameters(member.parameters);
+
+            for (const bodyStatement of member.body) {
+              this.analyzeStatement(bodyStatement);
+            }
+          });
+          continue;
+        }
+
+        if (member.body === undefined) {
+          if (!statement.abstract && !statement.virtual) {
+            throw createTypeError(
+              `Concrete class '${statement.identifier.name}' cannot contain method signature '${member.name.name}'`,
+              member.name.location
+            );
+          }
+          continue;
+        }
+
+        this.currentReturnType = member.returnType;
+        this.withScope(() => {
+          this.defineParameters(member.parameters);
+
+          for (const bodyStatement of member.body ?? []) {
+            this.analyzeStatement(bodyStatement);
+          }
+        });
+
+        if (member.returnType !== 'void' && !this.hasReturnStatement(member.body)) {
+          throw createTypeError(
+            `Method '${member.name.name}' must return a value of type '${member.returnType}'`,
+            member.name.location
+          );
+        }
+      }
+    } finally {
+      this.currentReturnType = previousReturnType;
+    }
   }
 
   private analyzeConditionalExpression(expression: ConditionalExpression): SemanticType {
@@ -363,12 +514,20 @@ export class SemanticAnalyzer {
         return this.analyzeConditionalExpression(expression);
       case 'Identifier':
         return this.analyzeIdentifier(expression);
+      case 'MemberExpression':
+        return this.analyzeMemberExpression(expression);
+      case 'NewExpression':
+        return this.analyzeNewExpression(expression);
       case 'NumberLiteral':
         return this.analyzeNumberLiteral(expression);
       case 'NullLiteral':
         return this.analyzeNullLiteral();
       case 'StringLiteral':
         return this.analyzeStringLiteral();
+      case 'SuperExpression':
+        return 'unknown';
+      case 'ThisExpression':
+        return 'unknown';
       case 'UnaryExpression':
         return this.analyzeUnaryExpression(expression);
     }
@@ -417,10 +576,11 @@ export class SemanticAnalyzer {
   private analyzeFunctionDeclaration(statement: FunctionDeclaration): void {
     this.scope.define(
       {
-        arity: 0,
+        arity: statement.parameters.length,
         callable: true,
         mutable: false,
         name: statement.identifier.name,
+        parameterTypes: statement.parameters.map((parameter) => parameter.typeAnnotation),
         returnType: statement.returnType,
         type: 'function',
       },
@@ -432,6 +592,8 @@ export class SemanticAnalyzer {
     try {
       this.currentReturnType = statement.returnType;
       this.withScope(() => {
+        this.defineParameters(statement.parameters);
+
         for (const bodyStatement of statement.body) {
           this.analyzeStatement(bodyStatement);
         }
@@ -484,8 +646,38 @@ export class SemanticAnalyzer {
         importedSymbol.returnType = exportedSymbol.returnType;
       }
 
+      if (exportedSymbol.parameterTypes !== undefined) {
+        importedSymbol.parameterTypes = exportedSymbol.parameterTypes;
+      }
+
       this.scope.define(importedSymbol, identifier.location);
     }
+  }
+
+  private analyzeMemberExpression(expression: MemberExpression): SemanticType {
+    this.analyzeExpression(expression.object);
+    return 'unknown';
+  }
+
+  private analyzeNewExpression(expression: NewExpression): SemanticType {
+    const symbol = this.scope.lookup(expression.callee.name, expression.callee.location);
+
+    if (symbol.classDeclaration === undefined) {
+      throw createTypeError(`Binding '${expression.callee.name}' is not a class`, expression.callee.location);
+    }
+
+    if (symbol.classDeclaration.abstract || symbol.classDeclaration.virtual) {
+      throw createTypeError(
+        `Cannot instantiate abstract class '${expression.callee.name}'`,
+        expression.callee.location
+      );
+    }
+
+    const constructorMember = symbol.classDeclaration.members.find((member) => member.kind === 'ClassConstructor');
+    const parameterTypes = constructorMember?.parameters.map((parameter) => parameter.typeAnnotation) ?? [];
+    this.analyzeArguments(expression.arguments, parameterTypes, expression.callee.name);
+
+    return expression.callee.name;
   }
 
   private analyzeNullLiteral(): SemanticType {
@@ -526,6 +718,9 @@ export class SemanticAnalyzer {
     switch (statement.kind) {
       case 'AssignmentStatement':
         this.analyzeAssignmentStatement(statement);
+        return;
+      case 'ClassDeclaration':
+        this.analyzeClassDeclaration(statement);
         return;
       case 'DoWhileStatement':
         this.analyzeDoWhileStatement(statement);
@@ -631,6 +826,83 @@ export class SemanticAnalyzer {
     });
   }
 
+  private defineParameters(parameters: Parameter[]): void {
+    for (const parameter of parameters) {
+      this.scope.define(
+        {
+          callable: false,
+          mutable: false,
+          name: parameter.identifier.name,
+          type: parameter.typeAnnotation,
+        },
+        parameter.identifier.location
+      );
+    }
+  }
+
+  private ensureImplementsContract(statement: ClassDeclaration, contract: ClassDeclaration): void {
+    const methods = this.getConcreteMethods(statement);
+
+    for (const contractMember of contract.members) {
+      if (contractMember.kind !== 'ClassMethod') {
+        continue;
+      }
+
+      const implementation = methods.get(contractMember.name.name);
+
+      if (implementation === undefined) {
+        throw createTypeError(
+          `Class '${statement.identifier.name}' must implement method '${contractMember.name.name}'`,
+          statement.identifier.location
+        );
+      }
+
+      if (!implementation.override) {
+        throw createTypeError(
+          `Method '${implementation.name.name}' must use 'override' to implement '${contract.identifier.name}'`,
+          implementation.name.location
+        );
+      }
+
+      if (implementation.returnType !== contractMember.returnType) {
+        throw createTypeError(
+          `Method '${implementation.name.name}' must return '${contractMember.returnType}' to implement '${contract.identifier.name}'`,
+          implementation.name.location
+        );
+      }
+
+      if (!this.haveSameParameters(implementation.parameters, contractMember.parameters)) {
+        throw createTypeError(
+          `Method '${implementation.name.name}' must match parameters from '${contract.identifier.name}'`,
+          implementation.name.location
+        );
+      }
+    }
+  }
+
+  private ensureSingleConstructor(statement: ClassDeclaration): void {
+    const constructors = statement.members.filter((member) => member.kind === 'ClassConstructor');
+
+    if (constructors.length > 1) {
+      throw createSyntaxError(
+        `Class '${statement.identifier.name}' can only have one constructor`,
+        statement.identifier.location
+      );
+    }
+  }
+
+  private getConcreteMethods(statement: ClassDeclaration): Map<string, ClassMethod> {
+    const methods = new Map<string, ClassMethod>();
+
+    for (const member of statement.members) {
+      if (member.kind === 'ClassMethod' && member.body !== undefined) {
+        methods.set(member.name.name, member);
+      }
+    }
+
+    return methods;
+  }
+
   private hasReturnStatement(statements: Statement[]): boolean {
     for (const statement of statements) {
       if (statement.kind === 'ReturnStatement') {
@@ -648,6 +920,14 @@ export class SemanticAnalyzer {
     }
 
     return false;
+  }
+
+  private haveSameParameters(left: Parameter[], right: Parameter[]): boolean {
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    return left.every((parameter, index) => parameter.typeAnnotation === right[index]?.typeAnnotation);
   }
 
   private withScope(callback: () => void): void {

@@ -66,6 +66,54 @@
           }
         },
         {
+          "match": "\\b(class)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.class.ts"
+            },
+            "2": {
+              "name": "entity.name.type.class.ts"
+            }
+          }
+        },
+        {
+          "match": "\\b(extends|implements)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.class.ts"
+            },
+            "2": {
+              "name": "entity.name.type.class.ts"
+            }
+          }
+        },
+        {
+          "match": "(:)\\s*([A-Z][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.separator.type-annotation.ts"
+            },
+            "2": {
+              "name": "entity.name.type.class.ts"
+            }
+          }
+        },
+        {
+          "match": "\\b(new)\\s+([A-Z][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.class.ts"
+            },
+            "2": {
+              "name": "entity.name.type.class.ts"
+            }
+          }
+        },
+        {
+          "name": "entity.name.type.class.ts",
+          "match": "\\b[A-Z][A-Za-z0-9_]*(?=\\s*\\.)"
+        },
+        {
           "match": "\\b(var)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": {
@@ -125,7 +173,23 @@
         },
         {
           "name": "keyword.control.ts",
-          "match": "\\b(?:export|from|import)\\b"
+          "match": "\\b(?:export|from|import|new)\\b"
+        },
+        {
+          "name": "storage.type.class.ts",
+          "match": "\\b(?:extends|implements)\\b"
+        },
+        {
+          "name": "storage.modifier.ts",
+          "match": "\\b(?:abstract|constructor|override|private|protected|public|static|virtual)\\b"
+        },
+        {
+          "name": "storage.type.class.ts",
+          "match": "\\bclass\\b"
+        },
+        {
+          "name": "variable.language.ts",
+          "match": "\\b(?:super|this)\\b"
         },
         {
           "name": "constant.language.null.ts",
@@ -170,6 +234,10 @@
         {
           "name": "keyword.operator.arithmetic.ts",
           "match": "[+\\-*/%]"
+        },
+        {
+          "name": "keyword.operator.accessor.ts",
+          "match": "\\."
         }
       ]
     },

@@ -1,10 +1,16 @@
 import type {
   ArrayLiteral,
   AssignmentOperator,
+  AssignmentTarget,
   AssignmentStatement,
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  ClassConstructor,
+  ClassDeclaration,
+  ClassMember,
+  ClassMethod,
+  ClassProperty,
   ConditionalExpression,
   DoWhileStatement,
   ExportDeclaration,
@@ -15,8 +21,11 @@ import type {
   FunctionReturnType,
   Identifier,
   ImportDeclaration,
+  MemberExpression,
+  NewExpression,
   NullLiteral,
   NumberLiteral,
+  Parameter,
   Program,
   ReturnStatement,
   Statement,
@@ -115,22 +124,11 @@ export class Parser {
   }
 
   private getTypeName(token: Token): TypeName {
-    switch (token.lexeme) {
-      case 'array':
-        return 'array';
-      case 'boolean':
-        return 'boolean';
-      case 'double':
-        return 'double';
-      case 'float':
-        return 'float';
-      case 'int':
-        return 'int';
-      case 'string':
-        return 'string';
-      default:
-        throw this.error(token, 'Expected a valid type name.');
+    if (token.lexeme === 'void') {
+      throw this.error(token, "'void' can only be used as a function return type.");
     }
+
+    return token.lexeme;
   }
 
   private isAssignmentOperatorToken(type: TokenType): boolean {
@@ -162,6 +160,35 @@ export class Parser {
     return false;
   }
 
+  private parseAccessModifier(): ClassMember['access'] {
+    if (this.match(TokenType.Public)) {
+      return 'public';
+    }
+
+    if (this.match(TokenType.Protected)) {
+      return 'protected';
+    }
+
+    if (this.match(TokenType.Private)) {
+      return 'private';
+    }
+
+    throw this.error(this.peek(), 'Expected access modifier for class member.');
+  }
+
+  private parseArguments(): Expression[] {
+    const args: Expression[] = [];
+
+    if (!this.check(TokenType.RightParen)) {
+      do {
+        args.push(this.parseExpression());
+      } while (this.match(TokenType.Comma) && !this.check(TokenType.RightParen));
+    }
+
+    this.consume(TokenType.RightParen, "Expected ')' after arguments.");
+    return args;
+  }
+
   private parseArrayLiteral(): ArrayLiteral {
     const elements: Expression[] = [];
 
@@ -179,17 +206,16 @@ export class Parser {
     };
   }
 
-  private parseAssignmentStatement(): AssignmentStatement {
-    const identifier = this.consume(TokenType.Identifier, 'Expected identifier before assignment.');
+  private parseAssignmentStatement(target: AssignmentTarget): AssignmentStatement {
     const operator = this.consumeAssignmentOperator();
 
     const value = this.parseExpression();
     this.consume(TokenType.Semicolon, "Expected ';' after assignment.");
 
     return {
-      identifier: this.createIdentifier(identifier),
       kind: 'AssignmentStatement',
       operator: operator.lexeme as AssignmentOperator,
+      target,
       value,
     };
   }
@@ -207,29 +233,142 @@ export class Parser {
   }
 
   private parseCallExpression(): Expression {
-    const expression = this.parsePrimary();
+    let expression = this.parsePrimary();
 
-    if (!this.match(TokenType.LeftParen)) {
+    while (true) {
+      if (this.match(TokenType.Dot)) {
+        const property = this.consume(TokenType.Identifier, "Expected property name after '.'.");
+        expression = {
+          kind: 'MemberExpression',
+          object: expression,
+          property: this.createIdentifier(property),
+        } satisfies MemberExpression;
+        continue;
+      }
+
+      if (this.match(TokenType.LeftParen)) {
+        expression = {
+          arguments: this.parseArguments(),
+          callee: expression,
+          kind: 'CallExpression',
+        } satisfies CallExpression;
+        continue;
+      }
+
       return expression;
     }
+  }
 
-    if (expression.kind !== 'Identifier') {
-      throw this.error(this.previous(), 'Only identifiers can be called as functions.');
+  private parseClassDeclaration(isAbstract: boolean): ClassDeclaration {
+    const isVirtual = isAbstract && this.match(TokenType.Virtual);
+
+    if (isAbstract) {
+      this.consume(TokenType.Class, "Expected 'class' after 'abstract'.");
     }
 
-    const args: Expression[] = [];
+    const name = this.consume(TokenType.Identifier, 'Expected class name.');
+    const declaration: ClassDeclaration = {
+      abstract: isAbstract,
+      implements: [],
+      identifier: this.createIdentifier(name),
+      kind: 'ClassDeclaration',
+      members: [],
+      virtual: isVirtual,
+    };
 
-    if (!this.check(TokenType.RightParen)) {
-      args.push(this.parseExpression());
+    if (this.match(TokenType.Extends)) {
+      declaration.baseClass = this.createIdentifier(
+        this.consume(TokenType.Identifier, "Expected class name after 'extends'.")
+      );
     }
 
-    this.consume(TokenType.RightParen, "Expected ')' after function arguments.");
+    if (this.match(TokenType.Implements)) {
+      do {
+        declaration.implements.push(
+          this.createIdentifier(this.consume(TokenType.Identifier, "Expected class name after 'implements'."))
+        );
+      } while (this.match(TokenType.Comma));
+    }
 
-    return {
-      arguments: args,
-      callee: expression,
-      kind: 'CallExpression',
-    } satisfies CallExpression;
+    this.consume(TokenType.LeftBrace, "Expected '{' before class body.");
+
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      declaration.members.push(this.parseClassMember(isVirtual));
+    }
+
+    this.consume(TokenType.RightBrace, "Expected '}' after class body.");
+    return declaration;
+  }
+
+  private parseClassMember(classIsVirtual: boolean): ClassMember {
+    const access = this.parseAccessModifier();
+    const isStatic = this.match(TokenType.Static);
+
+    if (this.match(TokenType.Constructor)) {
+      if (isStatic) {
+        throw this.error(this.previous(), 'Constructors cannot be static.');
+      }
+
+      this.consume(TokenType.LeftParen, "Expected '(' after constructor.");
+      const parameters = this.parseParameters();
+
+      return {
+        access,
+        body: this.parseBlockStatement(),
+        kind: 'ClassConstructor',
+        parameters,
+      } satisfies ClassConstructor;
+    }
+
+    if (this.match(TokenType.Var, TokenType.Val)) {
+      const declarationType = this.previous().lexeme as 'var' | 'val';
+      const name = this.consume(TokenType.Identifier, 'Expected property name.');
+      this.consume(TokenType.Colon, "Expected ':' after property name.");
+      const type = this.consume(TokenType.Identifier, "Expected property type after ':'.");
+      this.consume(TokenType.Equals, "Expected '=' after property type.");
+      const initializer = this.parseExpression();
+      this.consume(TokenType.Semicolon, "Expected ';' after property declaration.");
+
+      return {
+        access,
+        declarationType,
+        initializer,
+        kind: 'ClassProperty',
+        name: this.createIdentifier(name),
+        static: isStatic,
+        typeAnnotation: this.getTypeName(type),
+      } satisfies ClassProperty;
+    }
+
+    const isOverride = this.match(TokenType.Override);
+    const isVirtual = classIsVirtual || this.match(TokenType.Virtual);
+    const name = this.consume(TokenType.Identifier, 'Expected class member name.');
+
+    if (this.match(TokenType.LeftParen)) {
+      const parameters = this.parseParameters();
+      this.consume(TokenType.Colon, "Expected ':' after method parameters.");
+      const returnType = this.consume(TokenType.Identifier, "Expected method return type after ':'.");
+
+      const method: ClassMethod = {
+        access,
+        kind: 'ClassMethod',
+        name: this.createIdentifier(name),
+        override: isOverride,
+        parameters,
+        returnType: this.getFunctionReturnType(returnType),
+        static: isStatic,
+        virtual: isVirtual,
+      };
+
+      if (this.match(TokenType.Semicolon)) {
+        return method;
+      }
+
+      method.body = this.parseBlockStatement();
+      return method;
+    }
+
+    throw this.error(this.peek(), "Expected '(' after method name or 'var'/'val' before property name.");
   }
 
   private parseComparison(): Expression {
@@ -325,6 +464,20 @@ export class Parser {
       };
     }
 
+    if (this.match(TokenType.Abstract)) {
+      return {
+        declaration: this.parseClassDeclaration(true),
+        kind: 'ExportDeclaration',
+      };
+    }
+
+    if (this.match(TokenType.Class)) {
+      return {
+        declaration: this.parseClassDeclaration(false),
+        kind: 'ExportDeclaration',
+      };
+    }
+
     const identifier = this.consume(TokenType.Identifier, "Expected exported binding name after 'export'.");
     this.consume(TokenType.Semicolon, "Expected ';' after export declaration.");
 
@@ -385,7 +538,7 @@ export class Parser {
   private parseFunctionDeclaration(): FunctionDeclaration {
     const name = this.consume(TokenType.Identifier, "Expected function name after 'function'.");
     this.consume(TokenType.LeftParen, "Expected '(' after function name.");
-    this.consume(TokenType.RightParen, "Expected ')' after function parameters.");
+    const parameters = this.parseParameters();
     this.consume(TokenType.Colon, "Expected ':' after function parameters.");
     const returnType = this.consume(TokenType.Identifier, "Expected return type after ':'.");
 
@@ -393,6 +546,7 @@ export class Parser {
       body: this.parseBlockStatement(),
       identifier: this.createIdentifier(name),
       kind: 'FunctionDeclaration',
+      parameters,
       returnType: this.getFunctionReturnType(returnType),
     };
   }
@@ -457,6 +611,17 @@ export class Parser {
     return expression;
   }
 
+  private parseNewExpression(): NewExpression {
+    const callee = this.consume(TokenType.Identifier, "Expected class name after 'new'.");
+    this.consume(TokenType.LeftParen, "Expected '(' after class name.");
+
+    return {
+      arguments: this.parseArguments(),
+      callee: this.createIdentifier(callee),
+      kind: 'NewExpression',
+    };
+  }
+
   private parseNullLiteral(): NullLiteral {
     return {
       kind: 'NullLiteral',
@@ -481,6 +646,27 @@ export class Parser {
     return expression;
   }
 
+  private parseParameters(): Parameter[] {
+    const parameters: Parameter[] = [];
+
+    if (!this.check(TokenType.RightParen)) {
+      do {
+        const name = this.consume(TokenType.Identifier, 'Expected parameter name.');
+        this.consume(TokenType.Colon, "Expected ':' after parameter name.");
+        const type = this.consume(TokenType.Identifier, "Expected parameter type after ':'.");
+
+        parameters.push({
+          identifier: this.createIdentifier(name),
+          kind: 'Parameter',
+          typeAnnotation: this.getTypeName(type),
+        });
+      } while (this.match(TokenType.Comma) && !this.check(TokenType.RightParen));
+    }
+
+    this.consume(TokenType.RightParen, "Expected ')' after parameters.");
+    return parameters;
+  }
+
   private parsePrimary(): Expression {
     if (this.match(TokenType.LeftParen)) {
       const expression = this.parseExpression();
@@ -496,6 +682,10 @@ export class Parser {
       return this.createIdentifier(this.previous());
     }
 
+    if (this.match(TokenType.New)) {
+      return this.parseNewExpression();
+    }
+
     if (this.match(TokenType.Number)) {
       return this.createNumberLiteral(this.previous());
     }
@@ -509,6 +699,18 @@ export class Parser {
         kind: 'StringLiteral',
         value: this.previous().lexeme,
       } satisfies StringLiteral;
+    }
+
+    if (this.match(TokenType.Super)) {
+      return {
+        kind: 'SuperExpression',
+      };
+    }
+
+    if (this.match(TokenType.This)) {
+      return {
+        kind: 'ThisExpression',
+      };
     }
 
     throw this.error(this.peek(), 'Expected expression.');
@@ -559,6 +761,14 @@ export class Parser {
       return this.parseFunctionDeclaration();
     }
 
+    if (this.match(TokenType.Abstract)) {
+      return this.parseClassDeclaration(true);
+    }
+
+    if (this.match(TokenType.Class)) {
+      return this.parseClassDeclaration(false);
+    }
+
     if (this.match(TokenType.Return)) {
       return this.parseReturnStatement();
     }
@@ -567,11 +777,15 @@ export class Parser {
       return this.parseWhileStatement();
     }
 
-    if (this.check(TokenType.Identifier) && this.isAssignmentOperatorToken(this.peekNext().type)) {
-      return this.parseAssignmentStatement();
+    const expression = this.parseExpression();
+
+    if (
+      (expression.kind === 'Identifier' || expression.kind === 'MemberExpression') &&
+      this.isAssignmentOperatorToken(this.peek().type)
+    ) {
+      return this.parseAssignmentStatement(expression);
     }
 
-    const expression = this.parseExpression();
     this.consume(TokenType.Semicolon, "Expected ';' after expression.");
 
     return {
@@ -656,10 +870,6 @@ export class Parser {
     }
 
     return token;
-  }
-
-  private peekNext(): Token {
-    return this.tokens[this.current + 1] ?? this.peek();
   }
 
   private previous(): Token {

@@ -5,6 +5,7 @@ export type Program = {
 
 export type Statement =
   | AssignmentStatement
+  | ClassDeclaration
   | DoWhileStatement
   | ExportDeclaration
   | ExpressionStatement
@@ -21,11 +22,15 @@ export type SourceLocation = {
 };
 
 export type AssignmentStatement = {
-  identifier: Identifier;
   kind: 'AssignmentStatement';
   operator: AssignmentOperator;
+  target: AssignmentTarget;
   value: Expression;
 };
+
+export type AssignmentTarget = Identifier | MemberExpression;
+
+export type AccessModifier = 'private' | 'protected' | 'public';
 
 export type ForStatement = {
   body: Statement[];
@@ -41,7 +46,7 @@ export type DoWhileStatement = {
   kind: 'DoWhileStatement';
 };
 
-export type ExportableDeclaration = FunctionDeclaration | VariableDeclaration;
+export type ExportableDeclaration = ClassDeclaration | FunctionDeclaration | VariableDeclaration;
 
 export type ExportDeclaration = {
   declaration?: ExportableDeclaration;
@@ -53,7 +58,55 @@ export type FunctionDeclaration = {
   body: Statement[];
   identifier: Identifier;
   kind: 'FunctionDeclaration';
+  parameters: Parameter[];
   returnType: FunctionReturnType;
+};
+
+export type Parameter = {
+  identifier: Identifier;
+  kind: 'Parameter';
+  typeAnnotation: TypeName;
+};
+
+export type ClassDeclaration = {
+  abstract: boolean;
+  baseClass?: Identifier;
+  identifier: Identifier;
+  implements: Identifier[];
+  kind: 'ClassDeclaration';
+  members: ClassMember[];
+  virtual: boolean;
+};
+
+export type ClassMember = ClassConstructor | ClassMethod | ClassProperty;
+
+export type ClassConstructor = {
+  access: AccessModifier;
+  body: Statement[];
+  kind: 'ClassConstructor';
+  parameters: Parameter[];
+};
+
+export type ClassMethod = {
+  access: AccessModifier;
+  body?: Statement[];
+  kind: 'ClassMethod';
+  name: Identifier;
+  override: boolean;
+  parameters: Parameter[];
+  returnType: FunctionReturnType;
+  static: boolean;
+  virtual: boolean;
+};
+
+export type ClassProperty = {
+  access: AccessModifier;
+  declarationType: 'var' | 'val';
+  initializer: Expression;
+  kind: 'ClassProperty';
+  name: Identifier;
+  static: boolean;
+  typeAnnotation: TypeName;
 };
 
 export type ImportDeclaration = {
@@ -98,9 +151,13 @@ export type Expression =
   | CallExpression
   | ConditionalExpression
   | Identifier
+  | MemberExpression
+  | NewExpression
   | NullLiteral
   | NumberLiteral
   | StringLiteral
+  | SuperExpression
+  | ThisExpression
   | UnaryExpression;
 
 export type ArrayLiteral = {
@@ -120,6 +177,18 @@ export type ConditionalExpression = {
   consequent: Expression;
   kind: 'ConditionalExpression';
   test: Expression;
+};
+
+export type MemberExpression = {
+  kind: 'MemberExpression';
+  object: Expression;
+  property: Identifier;
+};
+
+export type NewExpression = {
+  arguments: Expression[];
+  callee: Identifier;
+  kind: 'NewExpression';
 };
 
 export type Identifier = {
@@ -145,9 +214,17 @@ export type StringLiteral = {
   value: string;
 };
 
-export type TypeName = 'array' | 'boolean' | 'double' | 'float' | 'int' | 'string';
+export type TypeName = string;
 
 export type FunctionReturnType = TypeName | 'void';
+
+export type SuperExpression = {
+  kind: 'SuperExpression';
+};
+
+export type ThisExpression = {
+  kind: 'ThisExpression';
+};
 
 export type UnaryExpression = {
   argument: Expression;
@@ -157,6 +234,6 @@ export type UnaryExpression = {
 
 export type CallExpression = {
   arguments: Expression[];
-  callee: Identifier;
+  callee: Expression;
   kind: 'CallExpression';
 };

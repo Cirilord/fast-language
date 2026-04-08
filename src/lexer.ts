@@ -3,17 +3,31 @@ import { type Token, TokenType } from './token';
 import { Char } from './utils/char';
 
 const KEYWORDS: Record<string, TokenType> = {
+  abstract: TokenType.Abstract,
+  class: TokenType.Class,
+  constructor: TokenType.Constructor,
   do: TokenType.Do,
+  extends: TokenType.Extends,
   export: TokenType.Export,
   for: TokenType.For,
   from: TokenType.From,
   function: TokenType.Function,
   import: TokenType.Import,
+  implements: TokenType.Implements,
+  new: TokenType.New,
   null: TokenType.Null,
   of: TokenType.Of,
+  override: TokenType.Override,
+  private: TokenType.Private,
+  protected: TokenType.Protected,
+  public: TokenType.Public,
   return: TokenType.Return,
+  static: TokenType.Static,
+  super: TokenType.Super,
+  this: TokenType.This,
   val: TokenType.Val,
   var: TokenType.Var,
+  virtual: TokenType.Virtual,
   while: TokenType.While,
 };
 
@@ -109,6 +123,11 @@ export class Lexer {
 
       if (Char.isColon(char)) {
         tokens.push(this.makeToken(TokenType.Colon, char, startColumn));
+        continue;
+      }
+
+      if (Char.isDot(char)) {
+        tokens.push(this.makeToken(TokenType.Dot, char, startColumn));
         continue;
       }
 
