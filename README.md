@@ -15,6 +15,7 @@ Right now the project is implemented in TypeScript and already supports:
 - logical assignment operators with `&&=`, `||=`, and `??=`
 - function declarations with typed parameters and optional default values
 - rest parameters with typed arrays like `...items: string[]`
+- generic functions and classes with type parameters like `<T, K = string>`
 - `void` functions with `function name(): void { ... }`
 - classes with mandatory access modifiers and `var`/`val` property mutability
 - `abstract virtual class` contracts with `implements`
@@ -85,6 +86,15 @@ function logAll(prefix: string, ...items: string[]): void {
   return;
 }
 
+function identity<T>(value: T): T {
+  return value;
+}
+
+function logGenericText<T, K = string>(importedText: K, output: T): T {
+  print(importedText);
+  return output;
+}
+
 abstract virtual class Printable {
   public printName(): void;
 }
@@ -118,7 +128,24 @@ class User extends BaseName implements Printable {
   }
 }
 
+class Box<T, K = string> {
+  public var label: K = null;
+  public var value: T = null;
+
+  public constructor(value: T, label: K) {
+    this.value = value;
+    this.label = label;
+  }
+
+  public getValue(): T {
+    return this.value;
+  }
+}
+
 val computedStatus: string = getStatus();
+val genericStatus: string = identity<string>(status);
+val importedStatus: string = logGenericText<string>("Imported generic text", status);
+var box: Box<string, string> = new Box<string>(status, "status-box");
 var user: User = new User();
 
 x += 5;
@@ -162,8 +189,11 @@ print(canFallback);
 print(fallbackText);
 print(status);
 print(computedStatus);
+print(genericStatus);
+print(importedStatus);
 print(importedText);
 print(profile);
+print(box.getValue());
 user.printName();
 User.showLabel();
 logStatus();

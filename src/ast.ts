@@ -60,6 +60,7 @@ export type FunctionDeclaration = {
   kind: 'FunctionDeclaration';
   parameters: Parameter[];
   returnType: FunctionReturnType;
+  typeParameters: TypeParameter[];
 };
 
 export type Parameter = {
@@ -77,6 +78,7 @@ export type ClassDeclaration = {
   implements: Identifier[];
   kind: 'ClassDeclaration';
   members: ClassMember[];
+  typeParameters: TypeParameter[];
   virtual: boolean;
 };
 
@@ -128,6 +130,12 @@ export type VariableDeclaration = {
   initializer: Expression;
   kind: 'VariableDeclaration';
   typeAnnotation?: TypeName;
+};
+
+export type TypeParameter = {
+  defaultType?: TypeName;
+  identifier: Identifier;
+  kind: 'TypeParameter';
 };
 
 export type WhileStatement = {
@@ -192,6 +200,7 @@ export type NewExpression = {
   arguments: Expression[];
   callee: Identifier;
   kind: 'NewExpression';
+  typeArguments: TypeName[];
 };
 
 export type Identifier = {
@@ -244,4 +253,5 @@ export type CallExpression = {
   arguments: Expression[];
   callee: Expression;
   kind: 'CallExpression';
+  typeArguments: TypeName[];
 };

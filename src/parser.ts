@@ -1,8 +1,8 @@
 import type {
   ArrayLiteral,
   AssignmentOperator,
-  AssignmentTarget,
   AssignmentStatement,
+  AssignmentTarget,
   BinaryExpression,
   BinaryOperator,
   CallExpression,
@@ -30,8 +30,9 @@ import type {
   ReturnStatement,
   Statement,
   StringLiteral,
-  TypeName,
   TupleLiteral,
+  TypeName,
+  TypeParameter,
   UnaryExpression,
   UnaryOperator,
   VariableDeclaration,
@@ -239,11 +240,14 @@ export class Parser {
         continue;
       }
 
+      const typeArguments = this.tryParseTypeArguments() ?? [];
+
       if (this.match(TokenType.LeftParen)) {
         expression = {
           arguments: this.parseArguments(),
           callee: expression,
           kind: 'CallExpression',
+          typeArguments,
         } satisfies CallExpression;
         continue;
       }
@@ -266,6 +270,7 @@ export class Parser {
       identifier: this.createIdentifier(name),
       kind: 'ClassDeclaration',
       members: [],
+      typeParameters: this.parseTypeParameters(),
       virtual: isVirtual,
     };
 
@@ -529,6 +534,7 @@ export class Parser {
 
   private parseFunctionDeclaration(): FunctionDeclaration {
     const name = this.consume(TokenType.Identifier, "Expected function name after 'function'.");
+    const typeParameters = this.parseTypeParameters();
     this.consume(TokenType.LeftParen, "Expected '(' after function name.");
     const parameters = this.parseParameters();
     this.consume(TokenType.Colon, "Expected ':' after function parameters.");
@@ -540,6 +546,7 @@ export class Parser {
       kind: 'FunctionDeclaration',
       parameters,
       returnType,
+      typeParameters,
     };
   }
 
@@ -614,12 +621,14 @@ export class Parser {
 
   private parseNewExpression(): NewExpression {
     const callee = this.consume(TokenType.Identifier, "Expected class name after 'new'.");
+    const typeArguments = this.check(TokenType.Less) ? this.parseTypeArguments() : [];
     this.consume(TokenType.LeftParen, "Expected '(' after class name.");
 
     return {
       arguments: this.parseArguments(),
       callee: this.createIdentifier(callee),
       kind: 'NewExpression',
+      typeArguments,
     };
   }
 
@@ -851,6 +860,18 @@ export class Parser {
     return expression;
   }
 
+  private parseTypeArguments(): TypeName[] {
+    this.consume(TokenType.Less, "Expected '<' before type arguments.");
+    const typeArguments: TypeName[] = [];
+
+    do {
+      typeArguments.push(this.parseTypeName());
+    } while (this.match(TokenType.Comma));
+
+    this.consume(TokenType.Greater, "Expected '>' after type arguments.");
+    return typeArguments;
+  }
+
   private parseTypeName(): TypeName {
     if (this.match(TokenType.LeftParen)) {
       const types: TypeName[] = [this.parseTypeName()];
@@ -871,12 +892,41 @@ export class Parser {
     const type = this.consume(TokenType.Identifier, 'Expected type name.');
     let typeName = this.getTypeName(type.lexeme);
 
+    if (this.check(TokenType.Less)) {
+      typeName = `${typeName}<${this.parseTypeArguments().join(',')}>`;
+    }
+
     while (this.match(TokenType.LeftBracket)) {
       this.consume(TokenType.RightBracket, "Expected ']' after array type.");
       typeName = `${typeName}[]`;
     }
 
     return typeName;
+  }
+
+  private parseTypeParameters(): TypeParameter[] {
+    if (!this.match(TokenType.Less)) {
+      return [];
+    }
+
+    const typeParameters: TypeParameter[] = [];
+
+    do {
+      const identifier = this.consume(TokenType.Identifier, 'Expected type parameter name.');
+      const typeParameter: TypeParameter = {
+        identifier: this.createIdentifier(identifier),
+        kind: 'TypeParameter',
+      };
+
+      if (this.match(TokenType.Equals)) {
+        typeParameter.defaultType = this.parseTypeName();
+      }
+
+      typeParameters.push(typeParameter);
+    } while (this.match(TokenType.Comma));
+
+    this.consume(TokenType.Greater, "Expected '>' after type parameters.");
+    return typeParameters;
   }
 
   private parseUnaryExpression(): Expression {
@@ -945,5 +995,27 @@ export class Parser {
     }
 
     return token;
+  }
+
+  private tryParseTypeArguments(): TypeName[] | undefined {
+    if (!this.check(TokenType.Less)) {
+      return undefined;
+    }
+
+    const start = this.current;
+
+    try {
+      const typeArguments = this.parseTypeArguments();
+
+      if (!this.check(TokenType.LeftParen)) {
+        this.current = start;
+        return undefined;
+      }
+
+      return typeArguments;
+    } catch {
+      this.current = start;
+      return undefined;
+    }
   }
 }

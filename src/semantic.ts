@@ -27,6 +27,7 @@ import type {
   Program,
   ReturnStatement,
   Statement,
+  TypeParameter,
   TypeName,
   TupleLiteral,
   UnaryExpression,
@@ -48,6 +49,7 @@ export type SemanticSymbol = {
   restParameterType?: TypeName;
   returnType?: SemanticType;
   type: SemanticType;
+  typeParameters?: TypeParameter[];
 };
 
 export type SemanticModuleExports = ReadonlyMap<string, SemanticSymbol>;
@@ -71,26 +73,29 @@ function isTupleType(type: SemanticType): boolean {
   return typeof type === 'string' && type.startsWith('(') && type.endsWith(')');
 }
 
-function splitTupleTypes(type: string): string[] {
-  const content = type.slice(1, -1);
-
+function splitTopLevel(content: string): string[] {
   if (content.trim() === '') {
     return [];
   }
 
   const parts: string[] = [];
   let current = '';
+  let angleDepth = 0;
   let bracketDepth = 0;
   let parenDepth = 0;
 
   for (const char of content) {
-    if (char === ',' && bracketDepth === 0 && parenDepth === 0) {
+    if (char === ',' && angleDepth === 0 && bracketDepth === 0 && parenDepth === 0) {
       parts.push(current.trim());
       current = '';
       continue;
     }
 
-    if (char === '[') {
+    if (char === '<') {
+      angleDepth += 1;
+    } else if (char === '>') {
+      angleDepth -= 1;
+    } else if (char === '[') {
       bracketDepth += 1;
     } else if (char === ']') {
       bracketDepth -= 1;
@@ -107,8 +112,59 @@ function splitTupleTypes(type: string): string[] {
   return parts;
 }
 
+function splitTupleTypes(type: string): string[] {
+  const content = type.slice(1, -1);
+
+  return splitTopLevel(content);
+}
+
+function parseAppliedGenericType(type: string): { args: string[]; baseName: string } | undefined {
+  const match = /^([A-Za-z_][A-Za-z0-9_]*)<(.*)>$/.exec(type);
+
+  if (match === null) {
+    return undefined;
+  }
+
+  const [, baseName, argsContent] = match;
+
+  if (baseName === undefined || argsContent === undefined) {
+    return undefined;
+  }
+
+  return {
+    args: splitTopLevel(argsContent),
+    baseName,
+  };
+}
+
 function getArrayElementType(type: string): string {
   return type.slice(0, -2);
+}
+
+function instantiateType(type: string, typeArguments: ReadonlyMap<string, TypeName>): string {
+  const direct = typeArguments.get(type);
+
+  if (direct !== undefined) {
+    return direct;
+  }
+
+  if (type.endsWith('[]')) {
+    return `${instantiateType(getArrayElementType(type), typeArguments)}[]`;
+  }
+
+  if (isTupleType(type)) {
+    return `(${splitTupleTypes(type)
+      .map((part) => instantiateType(part, typeArguments))
+      .join(',')})`;
+  }
+
+  const appliedType = parseAppliedGenericType(type);
+
+  if (appliedType !== undefined) {
+    return `${appliedType.baseName}<${appliedType.args.map((arg) => instantiateType(arg, typeArguments)).join(',')}>`;
+  }
+
+  return type;
 }
 
 function getWiderType(leftType: SemanticType, rightType: SemanticType): SemanticType | undefined {
@@ -134,6 +190,86 @@ function getWiderType(leftType: SemanticType, rightType: SemanticType): Semantic
   }
 
   return undefined;
+}
+
+function mergeInferredType(currentType: TypeName | undefined, nextType: SemanticType): TypeName | undefined {
+  if (nextType === 'unknown') {
+    return currentType;
+  }
+
+  if (currentType === undefined) {
+    return nextType;
+  }
+
+  if (currentType === nextType) {
+    return currentType;
+  }
+
+  return getWiderType(currentType, nextType);
+}
+
+function inferTypeArgumentsFromTypes(
+  expectedType: TypeName,
+  actualType: SemanticType,
+  genericNames: ReadonlySet<string>,
+  inferredTypes: Map<string, TypeName>
+): void {
+  if (actualType === 'unknown' || actualType === 'null') {
+    return;
+  }
+
+  if (genericNames.has(expectedType)) {
+    const mergedType = mergeInferredType(inferredTypes.get(expectedType), actualType);
+
+    if (mergedType !== undefined) {
+      inferredTypes.set(expectedType, mergedType);
+    }
+
+    return;
+  }
+
+  if (isArrayType(expectedType) && isArrayType(actualType)) {
+    inferTypeArgumentsFromTypes(
+      getArrayElementType(expectedType),
+      getArrayElementType(actualType),
+      genericNames,
+      inferredTypes
+    );
+    return;
+  }
+
+  if (isTupleType(expectedType) && isTupleType(actualType)) {
+    const expectedTypes = splitTupleTypes(expectedType);
+    const actualTypes = splitTupleTypes(actualType);
+
+    for (const [index, tupleExpectedType] of expectedTypes.entries()) {
+      const tupleActualType = actualTypes[index];
+
+      if (tupleActualType !== undefined) {
+        inferTypeArgumentsFromTypes(tupleExpectedType, tupleActualType, genericNames, inferredTypes);
+      }
+    }
+
+    return;
+  }
+
+  const expectedAppliedType = parseAppliedGenericType(expectedType);
+  const actualAppliedType = parseAppliedGenericType(actualType);
+
+  if (
+    expectedAppliedType !== undefined &&
+    actualAppliedType !== undefined &&
+    expectedAppliedType.baseName === actualAppliedType.baseName &&
+    expectedAppliedType.args.length === actualAppliedType.args.length
+  ) {
+    for (const [index, appliedExpectedType] of expectedAppliedType.args.entries()) {
+      const appliedActualType = actualAppliedType.args[index];
+
+      if (appliedActualType !== undefined) {
+        inferTypeArgumentsFromTypes(appliedExpectedType, appliedActualType, genericNames, inferredTypes);
+      }
+    }
+  }
 }
 
 function areTypesCompatible(expectedType: SemanticType, actualType: SemanticType): boolean {
@@ -484,11 +620,24 @@ export class SemanticAnalyzer {
         );
       }
 
+      const objectType = this.analyzeExpression(expression.callee.object);
+      const typeArguments = this.resolveClassTypeArguments(
+        resolved.owner,
+        objectType,
+        expression.callee.property.location
+      );
+      const parameterTypes = resolved.member.parameters.map((parameter) =>
+        instantiateType(parameter.typeAnnotation, typeArguments)
+      );
+      const restParameterType = resolved.member.parameters.find((parameter) => parameter.rest)?.typeAnnotation;
+      const instantiatedRestParameterType =
+        restParameterType === undefined ? undefined : instantiateType(restParameterType, typeArguments);
+
       this.analyzeArguments(
         expression.arguments,
-        resolved.member.parameters.map((parameter) => parameter.typeAnnotation),
+        parameterTypes,
         expression.callee.property.name,
-        resolved.member.parameters.find((parameter) => parameter.rest)?.typeAnnotation
+        instantiatedRestParameterType
       );
 
       if (expression.arguments.length < this.getMinimumArity(resolved.member.parameters)) {
@@ -498,7 +647,7 @@ export class SemanticAnalyzer {
         );
       }
 
-      return resolved.member.returnType;
+      return instantiateType(resolved.member.returnType, typeArguments);
     }
 
     if (expression.callee.kind === 'SuperExpression') {
@@ -544,6 +693,20 @@ export class SemanticAnalyzer {
           `'${expression.callee.name}' expects at least ${callee.minArity} arguments, got ${expression.arguments.length}`,
           expression.callee.location
         );
+      }
+
+      if (callee.typeParameters !== undefined && callee.typeParameters.length > 0) {
+        const typeArguments = this.analyzeGenericArguments(
+          expression.arguments,
+          callee.parameterTypes,
+          callee.typeParameters,
+          expression.typeArguments,
+          expression.callee.location,
+          expression.callee.name,
+          callee.restParameterType
+        ).returnTypeArguments;
+
+        return callee.returnType === undefined ? 'unknown' : instantiateType(callee.returnType, typeArguments);
       }
 
       this.analyzeArguments(
@@ -876,6 +1039,10 @@ export class SemanticAnalyzer {
       symbol.restParameterType = restParameter.typeAnnotation;
     }
 
+    if (statement.typeParameters.length > 0) {
+      symbol.typeParameters = statement.typeParameters;
+    }
+
     this.scope.define(symbol, statement.identifier.location);
 
     const previousReturnType = this.currentReturnType;
@@ -900,6 +1067,51 @@ export class SemanticAnalyzer {
         statement.identifier.location
       );
     }
+  }
+
+  private analyzeGenericArguments(
+    args: Expression[],
+    parameterTypes: TypeName[],
+    typeParameters: TypeParameter[],
+    explicitTypeArguments: TypeName[],
+    location: Identifier['location'],
+    ownerName: string,
+    restParameterType?: TypeName
+  ): { parameterTypes: TypeName[]; returnTypeArguments: Map<string, TypeName> } {
+    const genericNames = new Set(typeParameters.map((typeParameter) => typeParameter.identifier.name));
+    const inferredTypes = new Map<string, TypeName>();
+    const fixedArity = restParameterType === undefined ? parameterTypes.length : parameterTypes.length - 1;
+    const restElementType = restParameterType === undefined ? undefined : getArrayElementType(restParameterType);
+
+    for (const [index, arg] of args.entries()) {
+      const argType = this.analyzeExpression(arg);
+      const parameterType = index < fixedArity ? parameterTypes[index] : restElementType;
+
+      if (parameterType !== undefined) {
+        inferTypeArgumentsFromTypes(parameterType, argType, genericNames, inferredTypes);
+      }
+    }
+
+    const typeArguments = this.buildTypeArgumentMap(
+      typeParameters,
+      explicitTypeArguments,
+      inferredTypes,
+      location,
+      ownerName
+    );
+
+    const instantiatedParameterTypes = parameterTypes.map((parameterType) =>
+      instantiateType(parameterType, typeArguments)
+    );
+    const instantiatedRestParameterType =
+      restParameterType === undefined ? undefined : instantiateType(restParameterType, typeArguments);
+
+    this.analyzeArguments(args, instantiatedParameterTypes, ownerName, instantiatedRestParameterType);
+
+    return {
+      parameterTypes: instantiatedParameterTypes,
+      returnTypeArguments: typeArguments,
+    };
   }
 
   private analyzeIdentifier(expression: Identifier): SemanticType {
@@ -950,6 +1162,10 @@ export class SemanticAnalyzer {
         importedSymbol.restParameterType = exportedSymbol.restParameterType;
       }
 
+      if (exportedSymbol.typeParameters !== undefined) {
+        importedSymbol.typeParameters = exportedSymbol.typeParameters;
+      }
+
       this.scope.define(importedSymbol, identifier.location);
     }
   }
@@ -958,7 +1174,9 @@ export class SemanticAnalyzer {
     const resolved = this.resolveMemberExpression(expression);
 
     if (resolved.member.kind === 'ClassProperty') {
-      return resolved.member.typeAnnotation;
+      const objectType = this.analyzeExpression(expression.object);
+      const typeArguments = this.resolveClassTypeArguments(resolved.owner, objectType, expression.property.location);
+      return instantiateType(resolved.member.typeAnnotation, typeArguments);
     }
 
     return 'function';
@@ -990,6 +1208,34 @@ export class SemanticAnalyzer {
       throw createTypeError(
         `'${expression.callee.name}' expects at least ${constructorMember === undefined ? 0 : this.getMinimumArity(constructorMember.parameters)} arguments, got ${expression.arguments.length}`,
         expression.callee.location
+      );
+    }
+
+    if (symbol.classDeclaration.typeParameters.length > 0) {
+      const typeArguments = this.analyzeGenericArguments(
+        expression.arguments,
+        parameterTypes,
+        symbol.classDeclaration.typeParameters,
+        expression.typeArguments,
+        expression.callee.location,
+        expression.callee.name,
+        restParameterType
+      ).returnTypeArguments;
+
+      return this.buildAppliedGenericType(
+        expression.callee.name,
+        symbol.classDeclaration.typeParameters.map((typeParameter) => {
+          const typeArgument = typeArguments.get(typeParameter.identifier.name);
+
+          if (typeArgument === undefined) {
+            throw createTypeError(
+              `Could not resolve type parameter '${typeParameter.identifier.name}' in '${expression.callee.name}'`,
+              expression.callee.location
+            );
+          }
+
+          return typeArgument;
+        })
       );
     }
 
@@ -1160,6 +1406,55 @@ export class SemanticAnalyzer {
         this.analyzeStatement(bodyStatement);
       }
     });
+  }
+
+  private buildAppliedGenericType(baseName: string, typeArguments: TypeName[]): TypeName {
+    return typeArguments.length === 0 ? baseName : `${baseName}<${typeArguments.join(',')}>`;
+  }
+
+  private buildTypeArgumentMap(
+    typeParameters: TypeParameter[],
+    explicitTypeArguments: TypeName[],
+    inferredTypes: Map<string, TypeName>,
+    location: Identifier['location'],
+    ownerName: string
+  ): Map<string, TypeName> {
+    if (explicitTypeArguments.length > typeParameters.length) {
+      throw createTypeError(
+        `'${ownerName}' expects at most ${typeParameters.length} type arguments, got ${explicitTypeArguments.length}`,
+        location
+      );
+    }
+
+    const typeArguments = new Map<string, TypeName>();
+
+    for (const [index, typeParameter] of typeParameters.entries()) {
+      const explicitTypeArgument = explicitTypeArguments[index];
+
+      if (explicitTypeArgument !== undefined) {
+        typeArguments.set(typeParameter.identifier.name, explicitTypeArgument);
+        continue;
+      }
+
+      const inferredType = inferredTypes.get(typeParameter.identifier.name);
+
+      if (inferredType !== undefined) {
+        typeArguments.set(typeParameter.identifier.name, inferredType);
+        continue;
+      }
+
+      if (typeParameter.defaultType !== undefined) {
+        typeArguments.set(typeParameter.identifier.name, instantiateType(typeParameter.defaultType, typeArguments));
+        continue;
+      }
+
+      throw createTypeError(
+        `Could not resolve type parameter '${typeParameter.identifier.name}' in '${ownerName}'`,
+        location
+      );
+    }
+
+    return typeArguments;
   }
 
   private defineParameters(parameters: Parameter[]): void {
@@ -1366,7 +1661,8 @@ export class SemanticAnalyzer {
   }
 
   private getClassDeclaration(identifier: Identifier): ClassDeclaration {
-    const symbol = this.scope.lookup(identifier.name, identifier.location);
+    const appliedType = parseAppliedGenericType(identifier.name);
+    const symbol = this.scope.lookup(appliedType?.baseName ?? identifier.name, identifier.location);
 
     if (symbol.classDeclaration === undefined) {
       throw createTypeError(`Binding '${identifier.name}' is not a class`, identifier.location);
@@ -1527,6 +1823,38 @@ export class SemanticAnalyzer {
     }
 
     return this.currentClass;
+  }
+
+  private resolveClassTypeArguments(
+    statement: ClassDeclaration,
+    objectType: SemanticType,
+    location: Identifier['location']
+  ): Map<string, TypeName> {
+    const typeArguments = new Map<string, TypeName>();
+
+    if (statement.typeParameters.length === 0) {
+      return typeArguments;
+    }
+
+    const appliedType = typeof objectType === 'string' ? parseAppliedGenericType(objectType) : undefined;
+
+    if (appliedType !== undefined && appliedType.baseName === statement.identifier.name) {
+      return this.buildTypeArgumentMap(
+        statement.typeParameters,
+        appliedType.args,
+        new Map(),
+        location,
+        statement.identifier.name
+      );
+    }
+
+    if (objectType === statement.identifier.name) {
+      return new Map(
+        statement.typeParameters.map((typeParameter) => [typeParameter.identifier.name, typeParameter.identifier.name])
+      );
+    }
+
+    return this.buildTypeArgumentMap(statement.typeParameters, [], new Map(), location, statement.identifier.name);
   }
 
   private resolveMemberExpression(expression: MemberExpression): ResolvedClassMember {

@@ -16,6 +16,9 @@
       "include": "#declarations"
     },
     {
+      "include": "#generics"
+    },
+    {
       "include": "#keywords"
     },
     {
@@ -40,7 +43,7 @@
         },
         {
           "name": "support.function.ts",
-          "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()"
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*(?:<[^>]+>)?\\s*\\()"
         }
       ]
     },
@@ -134,6 +137,30 @@
               "name": "variable.other.readwrite.ts"
             }
           }
+        }
+      ]
+    },
+    "generics": {
+      "patterns": [
+        {
+          "name": "entity.name.type.type-parameter.ts",
+          "match": "(?<=<)\\s*[A-Za-z_][A-Za-z0-9_]*(?=\\s*(?:,|>|=))"
+        },
+        {
+          "name": "entity.name.type.type-parameter.ts",
+          "match": "(?<=,)\\s*[A-Za-z_][A-Za-z0-9_]*(?=\\s*(?:,|>|=))"
+        },
+        {
+          "name": "entity.name.type.type-parameter.ts",
+          "match": "\\b[A-Z]\\b"
+        },
+        {
+          "name": "punctuation.definition.typeparameters.begin.ts",
+          "match": "<"
+        },
+        {
+          "name": "punctuation.definition.typeparameters.end.ts",
+          "match": ">"
         }
       ]
     },
