@@ -18,6 +18,7 @@ Right now the project is implemented in TypeScript and already supports:
 - generic functions and classes with type parameters like `<T, K = string>`
 - `void` functions with `function name(): void { ... }`
 - named functions expose implicit `name` and `toString()`, and `print(functionName)` uses the function string representation
+- builtin runtime inspection helpers `typeOf(value)`, `isType(value, "string")`, and `isInstance(value, ClassName)`
 - `throw` statements with class-based errors that extend `Error`
 - `try { ... } except(error: ErrorType) { ... } finally { ... }`
 - classes with mandatory access modifiers and `var`/`val` property mutability
@@ -209,6 +210,14 @@ print(genericStatus);
 print(logGenericText);
 print(logGenericText.name);
 print(logGenericText.toString());
+print(typeOf(logGenericText));
+print(typeOf(User));
+print(typeOf(user));
+print(typeOf(items));
+print(isType(status, "string"));
+print(isType(x, "int"));
+print(isInstance(user, User));
+print(isInstance(user, BaseName));
 print(importedStatus);
 print(importedText);
 print(profile);
@@ -339,6 +348,9 @@ Then open a `.fast` file in the extension development window.
 - function return values must match the declared return type
 - functions that do not return a value use `void`, like `function name(): void { ... }`
 - named functions expose implicit `name` and `toString()`, like `logGenericText.name` and `logGenericText.toString()`
+- `typeOf(value)` returns runtime categories like `"string"`, `"int"`, `"function"`, `"class"`, `"object"`, `"array"`, and `"tuple"`
+- `isType(value, "string")` compares the runtime category returned by `typeOf`
+- `isInstance(value, ClassName)` checks whether an object instance belongs to a class or one of its base classes
 - `throw value;` requires a value whose class extends `Error`
 - `try` statements require at least one `except(error: ErrorType)` block, and may optionally end with `finally`
 - duplicate `except` types are rejected, and broader earlier `except` clauses make narrower later ones unreachable

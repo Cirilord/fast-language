@@ -277,7 +277,7 @@ function inferTypeArgumentsFromTypes(
 }
 
 function areTypesCompatible(expectedType: SemanticType, actualType: SemanticType): boolean {
-  if (actualType === 'null' || actualType === 'unknown' || expectedType === actualType) {
+  if (expectedType === 'unknown' || actualType === 'null' || actualType === 'unknown' || expectedType === actualType) {
     return true;
   }
 
@@ -398,9 +398,36 @@ export class SemanticAnalyzer {
   public constructor(private readonly resolveImport?: SemanticImportResolver) {
     this.scope.define({
       callable: true,
+      minArity: 1,
       mutable: false,
       name: 'print',
       returnType: 'unknown',
+      type: 'function',
+    });
+    this.scope.define({
+      callable: true,
+      minArity: 1,
+      mutable: false,
+      name: 'typeOf',
+      parameterTypes: ['unknown'],
+      returnType: 'string',
+      type: 'function',
+    });
+    this.scope.define({
+      callable: true,
+      minArity: 2,
+      mutable: false,
+      name: 'isType',
+      parameterTypes: ['unknown', 'string'],
+      returnType: 'boolean',
+      type: 'function',
+    });
+    this.scope.define({
+      callable: true,
+      minArity: 2,
+      mutable: false,
+      name: 'isInstance',
+      returnType: 'boolean',
       type: 'function',
     });
 
@@ -720,6 +747,40 @@ export class SemanticAnalyzer {
 
     if (!callee.callable) {
       throw createTypeError(`Binding '${expression.callee.name}' is not callable`, expression.callee.location);
+    }
+
+    if (expression.callee.name === 'isInstance') {
+      if (expression.arguments.length !== 2) {
+        throw createTypeError(
+          `'${expression.callee.name}' expects 2 arguments, got ${expression.arguments.length}`,
+          expression.callee.location
+        );
+      }
+
+      const instanceArgument = expression.arguments[0];
+
+      if (instanceArgument === undefined) {
+        throw createTypeError(`'${expression.callee.name}' expects 2 arguments, got ${expression.arguments.length}`);
+      }
+
+      this.analyzeExpression(instanceArgument);
+
+      const classArgument = expression.arguments[1];
+
+      if (classArgument === undefined || classArgument.kind !== 'Identifier') {
+        throw createTypeError(
+          `'isInstance' expects a class identifier as the second argument`,
+          expression.callee.location
+        );
+      }
+
+      const classSymbol = this.scope.lookup(classArgument.name, classArgument.location);
+
+      if (classSymbol.classDeclaration === undefined) {
+        throw createTypeError(`'isInstance' expects a class as the second argument`, classArgument.location);
+      }
+
+      return 'boolean';
     }
 
     if (callee.parameterTypes !== undefined) {

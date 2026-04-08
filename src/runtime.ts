@@ -419,6 +419,47 @@ export class Interpreter {
       },
       false
     );
+    this.scope.define(
+      'typeOf',
+      {
+        call: ([value]): RuntimeValue => ({
+          type: 'string',
+          value: this.getRuntimeTypeName(value ?? { type: 'null', value: null }),
+        }),
+        name: 'typeOf',
+        type: 'native-function',
+      },
+      false
+    );
+    this.scope.define(
+      'isType',
+      {
+        call: ([value, expectedType]): RuntimeValue => ({
+          type: 'boolean',
+          value:
+            expectedType?.type === 'string' &&
+            this.getRuntimeTypeName(value ?? { type: 'null', value: null }) === expectedType.value,
+        }),
+        name: 'isType',
+        type: 'native-function',
+      },
+      false
+    );
+    this.scope.define(
+      'isInstance',
+      {
+        call: ([value, classValue]): RuntimeValue => ({
+          type: 'boolean',
+          value:
+            value?.type === 'instance' &&
+            classValue?.type === 'class' &&
+            isSameClassOrSubclass(value.classValue, classValue),
+        }),
+        name: 'isInstance',
+        type: 'native-function',
+      },
+      false
+    );
 
     for (const builtinClass of getBuiltinClassDeclarations()) {
       this.executeClassDeclaration(builtinClass);
@@ -1461,6 +1502,35 @@ export class Interpreter {
 
   private getErrorClassValue(): ClassValue {
     return this.lookupClassValue('Error');
+  }
+
+  private getRuntimeTypeName(value: RuntimeValue): string {
+    switch (value.type) {
+      case 'array':
+        return 'array';
+      case 'boolean':
+        return 'boolean';
+      case 'bound-method':
+        return 'function';
+      case 'class':
+        return 'class';
+      case 'function':
+        return 'function';
+      case 'instance':
+        return 'object';
+      case 'native-function':
+        return 'function';
+      case 'null':
+        return 'null';
+      case 'number':
+        return value.numberType;
+      case 'string':
+        return 'string';
+      case 'super':
+        return 'object';
+      case 'tuple':
+        return 'tuple';
+    }
   }
 
   private lookupClassValue(typeName: TypeName): ClassValue {
