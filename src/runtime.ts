@@ -347,6 +347,10 @@ function getClassChain(classValue: ClassValue): ClassValue[] {
   return [...baseChain, classValue];
 }
 
+function getMinimumArity(parameters: Parameter[]): number {
+  return parameters.filter((parameter) => parameter.defaultValue === undefined).length;
+}
+
 export class Interpreter {
   private readonly exports = new Map<string, RuntimeValue>();
   private scope = new Scope();
@@ -382,9 +386,13 @@ export class Interpreter {
     return this.exports;
   }
 
-  private assertArgumentCount(name: string, expected: number, actual: number): void {
-    if (actual !== expected) {
-      throw createTypeError(`'${name}' expects ${expected} arguments, got ${actual}`);
+  private assertArgumentCount(name: string, minimum: number, maximum: number, actual: number): void {
+    if (actual < minimum) {
+      throw createTypeError(`'${name}' expects at least ${minimum} arguments, got ${actual}`);
+    }
+
+    if (actual > maximum) {
+      throw createTypeError(`'${name}' expects at most ${maximum} arguments, got ${actual}`);
     }
   }
 
@@ -426,7 +434,9 @@ export class Interpreter {
 
   private bindParameters(parameters: Parameter[], args: RuntimeValue[]): void {
     for (const [index, parameter] of parameters.entries()) {
-      const arg = args[index];
+      const arg =
+        args[index] ??
+        (parameter.defaultValue === undefined ? undefined : this.evaluateExpression(parameter.defaultValue));
 
       if (arg === undefined) {
         throw createTypeError(`Missing argument for parameter '${parameter.identifier.name}'`);
@@ -437,7 +447,12 @@ export class Interpreter {
   }
 
   private callBoundMethod(callee: BoundMethodValue, args: RuntimeValue[]): RuntimeValue {
-    this.assertArgumentCount(callee.method.name.name, callee.method.parameters.length, args.length);
+    this.assertArgumentCount(
+      callee.method.name.name,
+      getMinimumArity(callee.method.parameters),
+      callee.method.parameters.length,
+      args.length
+    );
     const parentScope = this.scope;
 
     try {
@@ -477,6 +492,8 @@ export class Interpreter {
 
   private callConstructor(classValue: ClassValue, instance: InstanceValue, args: RuntimeValue[]): RuntimeValue {
     if (classValue.constructorMember === undefined) {
+      this.assertArgumentCount(classValue.name, 0, 0, args.length);
+
       if (classValue.baseClass !== undefined) {
         this.callConstructor(classValue.baseClass, instance, []);
       }
@@ -484,7 +501,12 @@ export class Interpreter {
       return { type: 'null', value: null };
     }
 
-    this.assertArgumentCount(classValue.name, classValue.constructorMember.parameters.length, args.length);
+    this.assertArgumentCount(
+      classValue.name,
+      getMinimumArity(classValue.constructorMember.parameters),
+      classValue.constructorMember.parameters.length,
+      args.length
+    );
     const previousScope = this.scope;
 
     try {
@@ -523,7 +545,7 @@ export class Interpreter {
   }
 
   private callUserFunction(callee: UserFunctionValue, args: RuntimeValue[]): RuntimeValue {
-    this.assertArgumentCount(callee.name, callee.parameters.length, args.length);
+    this.assertArgumentCount(callee.name, getMinimumArity(callee.parameters), callee.parameters.length, args.length);
 
     try {
       return this.withScopeFrom(callee.closure, () => {

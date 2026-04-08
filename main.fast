@@ -27,8 +27,15 @@ function getStatus(): string {
   return status;
 }
 
-function logStatus(): void {
+function logStatus(label: string = "status"): void {
+  print(label);
   print(status);
+  return;
+}
+
+function logStatusTwice(firstLabel: string = "first", secondLabel: string = "second"): void {
+  print(firstLabel);
+  print(secondLabel);
   return;
 }
 
@@ -50,7 +57,7 @@ class User extends BaseName implements Printable {
   public static val label: string = "User";
   public var displayName: string = "Fast";
 
-  public constructor(displayName: string) {
+  public constructor(displayName: string = "Fast object") {
     super();
     this.displayName = displayName;
   }
@@ -66,7 +73,7 @@ class User extends BaseName implements Printable {
 }
 
 val computedStatus: string = getStatus();
-var user: User = new User("Fast object");
+var user: User = new User();
 
 x += 5;
 x -= 2;
@@ -117,4 +124,6 @@ print(importedText);
 user.printName();
 User.showLabel();
 logStatus();
+logStatusTwice();
+logStatus("state");
 logImportedText();

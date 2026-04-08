@@ -44,6 +44,7 @@ This file tracks working conventions for the `fast` language project so future c
 - `while` loops use `while (condition) { ... }`, and the condition must be boolean.
 - `do while` loops use `do { ... } while (condition);`, and the condition must be boolean.
 - Functions use `function name(parameter: type): type { return value; }`.
+- Parameters can use default values, like `label: string = "status"`.
 - Function return values must match the declared return type.
 - Functions that do not return a value use `void`, like `function name(): void { ... }`.
 - Classes use `class Name { ... }`.
@@ -53,7 +54,7 @@ This file tracks working conventions for the `fast` language project so future c
 - `public`, `protected`, and `private` are checked semantically on member access and constructor calls.
 - Class properties require `var` or `val` to define mutability, like `public var name: string = "Fast";`.
 - `static` comes after the access modifier and before `var`/`val`, like `public static val label: string = "User";`.
-- Constructors use `public constructor(parameter: type) { ... }`.
+- Constructors use `public constructor(parameter: type = value) { ... }`.
 - Methods require return annotations and can accept parameters, like `public name(prefix: string): string { ... }`.
 - Abstract virtual class methods use signatures without bodies, like `public print(): void;`.
 - Implemented contract methods use `override`, like `public override print(): void { ... }`.

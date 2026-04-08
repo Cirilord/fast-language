@@ -40,6 +40,7 @@ export type SemanticSymbol = {
   arity?: number;
   callable: boolean;
   classDeclaration?: ClassDeclaration;
+  minArity?: number;
   mutable: boolean;
   name: string;
   parameterTypes?: TypeName[];
@@ -182,8 +183,8 @@ export class SemanticAnalyzer {
   }
 
   private analyzeArguments(args: Expression[], parameterTypes: TypeName[], calleeName: string): void {
-    if (args.length !== parameterTypes.length) {
-      throw createTypeError(`'${calleeName}' expects ${parameterTypes.length} arguments, got ${args.length}`);
+    if (args.length > parameterTypes.length) {
+      throw createTypeError(`'${calleeName}' expects at most ${parameterTypes.length} arguments, got ${args.length}`);
     }
 
     for (const [index, arg] of args.entries()) {
@@ -363,6 +364,13 @@ export class SemanticAnalyzer {
         expression.callee.property.name
       );
 
+      if (expression.arguments.length < this.getMinimumArity(resolved.member.parameters)) {
+        throw createTypeError(
+          `'${expression.callee.property.name}' expects at least ${this.getMinimumArity(resolved.member.parameters)} arguments, got ${expression.arguments.length}`,
+          expression.callee.property.location
+        );
+      }
+
       return resolved.member.returnType;
     }
 
@@ -376,6 +384,12 @@ export class SemanticAnalyzer {
       const baseClass = this.getClassDeclaration(currentClass.baseClass);
       const constructorMember = this.getConstructor(baseClass);
       const parameterTypes = constructorMember?.parameters.map((parameter) => parameter.typeAnnotation) ?? [];
+      const minimumArity = constructorMember === undefined ? 0 : this.getMinimumArity(constructorMember.parameters);
+
+      if (expression.arguments.length < minimumArity) {
+        throw createTypeError(`'super' expects at least ${minimumArity} arguments, got ${expression.arguments.length}`);
+      }
+
       this.analyzeArguments(expression.arguments, parameterTypes, 'super');
       return 'void';
     }
@@ -397,6 +411,13 @@ export class SemanticAnalyzer {
     }
 
     if (callee.parameterTypes !== undefined) {
+      if (callee.minArity !== undefined && expression.arguments.length < callee.minArity) {
+        throw createTypeError(
+          `'${expression.callee.name}' expects at least ${callee.minArity} arguments, got ${expression.arguments.length}`,
+          expression.callee.location
+        );
+      }
+
       this.analyzeArguments(expression.arguments, callee.parameterTypes, expression.callee.name);
       return callee.returnType ?? 'unknown';
     }
@@ -492,6 +513,7 @@ export class SemanticAnalyzer {
         }
 
         if (member.kind === 'ClassConstructor') {
+          this.analyzeDefaultParameters(member.parameters, `${statement.identifier.name}.constructor`);
           this.currentReturnType = 'void';
           this.withScope(() => {
             this.defineParameters(member.parameters);
@@ -502,6 +524,8 @@ export class SemanticAnalyzer {
           });
           continue;
         }
+
+        this.analyzeDefaultParameters(member.parameters, member.name.name);
 
         if (member.body === undefined) {
           if (!statement.virtual && !member.virtual) {
@@ -561,6 +585,33 @@ export class SemanticAnalyzer {
     }
 
     throw createTypeError('Ternary branches must have compatible types');
+  }
+
+  private analyzeDefaultParameters(parameters: Parameter[], ownerName: string): void {
+    this.withScope(() => {
+      for (const parameter of parameters) {
+        if (parameter.defaultValue !== undefined) {
+          const defaultType = this.analyzeExpression(parameter.defaultValue);
+
+          if (!areTypesCompatible(parameter.typeAnnotation, defaultType)) {
+            throw createTypeError(
+              `Default value for parameter '${parameter.identifier.name}' in '${ownerName}' must be '${parameter.typeAnnotation}', got '${defaultType}'`,
+              parameter.identifier.location
+            );
+          }
+        }
+
+        this.scope.define(
+          {
+            callable: false,
+            mutable: false,
+            name: parameter.identifier.name,
+            type: parameter.typeAnnotation,
+          },
+          parameter.identifier.location
+        );
+      }
+    });
   }
 
   private analyzeDoWhileStatement(statement: DoWhileStatement): void {
@@ -668,6 +719,7 @@ export class SemanticAnalyzer {
       {
         arity: statement.parameters.length,
         callable: true,
+        minArity: this.getMinimumArity(statement.parameters),
         mutable: false,
         name: statement.identifier.name,
         parameterTypes: statement.parameters.map((parameter) => parameter.typeAnnotation),
@@ -680,6 +732,7 @@ export class SemanticAnalyzer {
     const previousReturnType = this.currentReturnType;
 
     try {
+      this.analyzeDefaultParameters(statement.parameters, statement.identifier.name);
       this.currentReturnType = statement.returnType;
       this.withScope(() => {
         this.defineParameters(statement.parameters);
@@ -736,6 +789,10 @@ export class SemanticAnalyzer {
         importedSymbol.returnType = exportedSymbol.returnType;
       }
 
+      if (exportedSymbol.minArity !== undefined) {
+        importedSymbol.minArity = exportedSymbol.minArity;
+      }
+
       if (exportedSymbol.parameterTypes !== undefined) {
         importedSymbol.parameterTypes = exportedSymbol.parameterTypes;
       }
@@ -771,6 +828,17 @@ export class SemanticAnalyzer {
     this.ensureConstructorIsAccessible(symbol.classDeclaration, expression.callee);
     const constructorMember = symbol.classDeclaration.members.find((member) => member.kind === 'ClassConstructor');
     const parameterTypes = constructorMember?.parameters.map((parameter) => parameter.typeAnnotation) ?? [];
+
+    if (
+      expression.arguments.length <
+      (constructorMember === undefined ? 0 : this.getMinimumArity(constructorMember.parameters))
+    ) {
+      throw createTypeError(
+        `'${expression.callee.name}' expects at least ${constructorMember === undefined ? 0 : this.getMinimumArity(constructorMember.parameters)} arguments, got ${expression.arguments.length}`,
+        expression.callee.location
+      );
+    }
+
     this.analyzeArguments(expression.arguments, parameterTypes, expression.callee.name);
 
     return expression.callee.name;
@@ -1220,6 +1288,10 @@ export class SemanticAnalyzer {
     }
 
     return undefined;
+  }
+
+  private getMinimumArity(parameters: Parameter[]): number {
+    return parameters.filter((parameter) => parameter.defaultValue === undefined).length;
   }
 
   private getProperty(statement: ClassDeclaration, name: string, isStatic: boolean): ResolvedClassMember | undefined {

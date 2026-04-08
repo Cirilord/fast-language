@@ -63,6 +63,7 @@ export type FunctionDeclaration = {
 };
 
 export type Parameter = {
+  defaultValue?: Expression;
   identifier: Identifier;
   kind: 'Parameter';
   typeAnnotation: TypeName;

@@ -13,7 +13,7 @@ Right now the project is implemented in TypeScript and already supports:
 - ternary expressions with `condition ? value : value`
 - compound assignment operators with `+=`, `-=`, `*=`, `/=`, and `%=`
 - logical assignment operators with `&&=`, `||=`, and `??=`
-- function declarations with `function name(): type { return value; }`
+- function declarations with typed parameters and optional default values
 - `void` functions with `function name(): void { ... }`
 - classes with mandatory access modifiers and `var`/`val` property mutability
 - `abstract virtual class` contracts with `implements`
@@ -69,7 +69,8 @@ function getStatus(): string {
   return status;
 }
 
-function logStatus(): void {
+function logStatus(label: string = "status"): void {
+  print(label);
   print(status);
   return;
 }
@@ -92,7 +93,7 @@ class User extends BaseName implements Printable {
   public static val label: string = "User";
   public var displayName: string = "Fast";
 
-  public constructor(displayName: string) {
+  public constructor(displayName: string = "Fast object") {
     super();
     this.displayName = displayName;
   }
@@ -108,7 +109,7 @@ class User extends BaseName implements Printable {
 }
 
 val computedStatus: string = getStatus();
-var user: User = new User("Fast object");
+var user: User = new User();
 
 x += 5;
 x -= 2;
@@ -255,6 +256,7 @@ Then open a `.fast` file in the extension development window.
 - `while` loops use `while (condition) { ... }` and the condition must be boolean
 - `do while` loops use `do { ... } while (condition);` and the condition must be boolean
 - functions use `function name(parameter: type): type { return value; }`
+- parameters can use default values like `label: string = "status"`
 - function return values must match the declared return type
 - functions that do not return a value use `void`, like `function name(): void { ... }`
 - classes use `class Name { ... }`
@@ -264,7 +266,7 @@ Then open a `.fast` file in the extension development window.
 - `public`, `protected`, and `private` are checked semantically on member access and constructor calls
 - class properties require `var` or `val`, like `public var name: string = "Fast";`
 - `static` comes after the access modifier and before `var`/`val`, like `public static val label: string = "User";`
-- constructors use `public constructor(parameter: type) { ... }`
+- constructors use `public constructor(parameter: type = value) { ... }`
 - methods use return annotations and can accept parameters, like `public name(prefix: string): string { ... }`
 - abstract virtual class methods use signatures without bodies, like `public print(): void;`
 - implemented contract methods use `override`, like `public override print(): void { ... }`

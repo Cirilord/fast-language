@@ -648,6 +648,7 @@ export class Parser {
 
   private parseParameters(): Parameter[] {
     const parameters: Parameter[] = [];
+    let foundDefault = false;
 
     if (!this.check(TokenType.RightParen)) {
       do {
@@ -655,11 +656,20 @@ export class Parser {
         this.consume(TokenType.Colon, "Expected ':' after parameter name.");
         const type = this.consume(TokenType.Identifier, "Expected parameter type after ':'.");
 
-        parameters.push({
+        const parameter: Parameter = {
           identifier: this.createIdentifier(name),
           kind: 'Parameter',
           typeAnnotation: this.getTypeName(type),
-        });
+        };
+
+        if (this.match(TokenType.Equals)) {
+          parameter.defaultValue = this.parseExpression();
+          foundDefault = true;
+        } else if (foundDefault) {
+          throw this.error(this.peek(), 'Required parameters cannot appear after parameters with default values.');
+        }
+
+        parameters.push(parameter);
       } while (this.match(TokenType.Comma) && !this.check(TokenType.RightParen));
     }
 
