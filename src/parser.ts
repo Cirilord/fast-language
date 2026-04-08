@@ -650,19 +650,32 @@ export class Parser {
   private parseParameters(): Parameter[] {
     const parameters: Parameter[] = [];
     let foundDefault = false;
+    let foundRest = false;
 
     if (!this.check(TokenType.RightParen)) {
       do {
+        if (foundRest) {
+          throw this.error(this.peek(), 'Rest parameter must be the last parameter.');
+        }
+
+        const isRest = this.match(TokenType.Ellipsis);
         const name = this.consume(TokenType.Identifier, 'Expected parameter name.');
         this.consume(TokenType.Colon, "Expected ':' after parameter name.");
 
         const parameter: Parameter = {
           identifier: this.createIdentifier(name),
           kind: 'Parameter',
+          rest: isRest,
           typeAnnotation: this.parseTypeName(),
         };
 
-        if (this.match(TokenType.Equals)) {
+        if (isRest) {
+          foundRest = true;
+
+          if (this.match(TokenType.Equals)) {
+            throw this.error(this.previous(), 'Rest parameters cannot have default values.');
+          }
+        } else if (this.match(TokenType.Equals)) {
           parameter.defaultValue = this.parseExpression();
           foundDefault = true;
         } else if (foundDefault) {

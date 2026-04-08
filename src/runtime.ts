@@ -364,7 +364,11 @@ function getClassChain(classValue: ClassValue): ClassValue[] {
 }
 
 function getMinimumArity(parameters: Parameter[]): number {
-  return parameters.filter((parameter) => parameter.defaultValue === undefined).length;
+  return parameters.filter((parameter) => parameter.defaultValue === undefined && !parameter.rest).length;
+}
+
+function hasRestParameter(parameters: Parameter[]): boolean {
+  return parameters.some((parameter) => parameter.rest);
 }
 
 export class Interpreter {
@@ -450,6 +454,19 @@ export class Interpreter {
 
   private bindParameters(parameters: Parameter[], args: RuntimeValue[]): void {
     for (const [index, parameter] of parameters.entries()) {
+      if (parameter.rest) {
+        this.scope.define(
+          parameter.identifier.name,
+          {
+            elements: args.slice(index),
+            type: 'array',
+          },
+          false,
+          parameter.typeAnnotation
+        );
+        return;
+      }
+
       const arg =
         args[index] ??
         (parameter.defaultValue === undefined ? undefined : this.evaluateExpression(parameter.defaultValue));
@@ -466,7 +483,7 @@ export class Interpreter {
     this.assertArgumentCount(
       callee.method.name.name,
       getMinimumArity(callee.method.parameters),
-      callee.method.parameters.length,
+      hasRestParameter(callee.method.parameters) ? Number.POSITIVE_INFINITY : callee.method.parameters.length,
       args.length
     );
     const parentScope = this.scope;
@@ -520,7 +537,9 @@ export class Interpreter {
     this.assertArgumentCount(
       classValue.name,
       getMinimumArity(classValue.constructorMember.parameters),
-      classValue.constructorMember.parameters.length,
+      hasRestParameter(classValue.constructorMember.parameters)
+        ? Number.POSITIVE_INFINITY
+        : classValue.constructorMember.parameters.length,
       args.length
     );
     const previousScope = this.scope;
@@ -561,7 +580,12 @@ export class Interpreter {
   }
 
   private callUserFunction(callee: UserFunctionValue, args: RuntimeValue[]): RuntimeValue {
-    this.assertArgumentCount(callee.name, getMinimumArity(callee.parameters), callee.parameters.length, args.length);
+    this.assertArgumentCount(
+      callee.name,
+      getMinimumArity(callee.parameters),
+      hasRestParameter(callee.parameters) ? Number.POSITIVE_INFINITY : callee.parameters.length,
+      args.length
+    );
 
     try {
       return this.withScopeFrom(callee.closure, () => {

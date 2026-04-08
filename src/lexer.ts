@@ -127,6 +127,13 @@ export class Lexer {
       }
 
       if (Char.isDot(char)) {
+        if (Char.isDot(this.peek()) && Char.isDot(this.peekNext())) {
+          this.advance();
+          this.advance();
+          tokens.push(this.makeToken(TokenType.Ellipsis, '...', startColumn));
+          continue;
+        }
+
         tokens.push(this.makeToken(TokenType.Dot, char, startColumn));
         continue;
       }
@@ -329,6 +336,10 @@ export class Lexer {
 
   private peek(): string {
     return this.source[this.current] ?? '\0';
+  }
+
+  private peekNext(): string {
+    return this.source[this.current + 1] ?? '\0';
   }
 
   private readIdentifier(firstChar: string, startColumn: number): Token {

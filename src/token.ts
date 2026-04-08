@@ -9,6 +9,7 @@ export enum TokenType {
   Constructor = 'CONSTRUCTOR',
   Do = 'DO',
   Dot = 'DOT',
+  Ellipsis = 'ELLIPSIS',
   EOF = 'EOF',
   EqualEqual = 'EQUAL_EQUAL',
   Equals = 'EQUALS',

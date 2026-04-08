@@ -40,6 +40,12 @@ function logStatusTwice(firstLabel: string = "first", secondLabel: string = "sec
   return;
 }
 
+function logAll(prefix: string, ...items: string[]): void {
+  print(prefix);
+  print(items);
+  return;
+}
+
 abstract virtual class Printable {
   public printName(): void;
 }
@@ -127,5 +133,6 @@ user.printName();
 User.showLabel();
 logStatus();
 logStatusTwice();
+logAll("values", "alpha", "beta", "gamma");
 logStatus("state");
 logImportedText();

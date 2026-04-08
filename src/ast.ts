@@ -66,6 +66,7 @@ export type Parameter = {
   defaultValue?: Expression;
   identifier: Identifier;
   kind: 'Parameter';
+  rest: boolean;
   typeAnnotation: TypeName;
 };
 

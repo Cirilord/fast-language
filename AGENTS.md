@@ -46,6 +46,7 @@ This file tracks working conventions for the `fast` language project so future c
 - `do while` loops use `do { ... } while (condition);`, and the condition must be boolean.
 - Functions use `function name(parameter: type): type { return value; }`.
 - Parameters can use default values, like `label: string = "status"`.
+- Rest parameters use typed arrays and come last, like `...items: string[]`.
 - Function return values must match the declared return type.
 - Functions that do not return a value use `void`, like `function name(): void { ... }`.
 - Classes use `class Name { ... }`.

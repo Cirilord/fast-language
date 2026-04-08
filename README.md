@@ -14,6 +14,7 @@ Right now the project is implemented in TypeScript and already supports:
 - compound assignment operators with `+=`, `-=`, `*=`, `/=`, and `%=`
 - logical assignment operators with `&&=`, `||=`, and `??=`
 - function declarations with typed parameters and optional default values
+- rest parameters with typed arrays like `...items: string[]`
 - `void` functions with `function name(): void { ... }`
 - classes with mandatory access modifiers and `var`/`val` property mutability
 - `abstract virtual class` contracts with `implements`
@@ -75,6 +76,12 @@ function getStatus(): string {
 function logStatus(label: string = "status"): void {
   print(label);
   print(status);
+  return;
+}
+
+function logAll(prefix: string, ...items: string[]): void {
+  print(prefix);
+  print(items);
   return;
 }
 
@@ -160,6 +167,7 @@ print(profile);
 user.printName();
 User.showLabel();
 logStatus();
+logAll("values", "alpha", "beta", "gamma");
 logImportedText();
 ```
 
