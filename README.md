@@ -26,6 +26,8 @@ Right now the project is implemented in TypeScript and already supports:
 - typed variable declarations like `var name: string = "Fast";`
 - inferred variable declarations like `var name = "Fast";`
 - contextual `null` values like `var name: string = null;`
+- typed arrays like `string[]`
+- tuple types and literals like `(string, int)` and `("Fast", 10)`
 - string literals with `"`
 - multiline strings with `` ` ``
 - line comments with `//`
@@ -45,7 +47,8 @@ Right now the project is implemented in TypeScript and already supports:
 import { importedText, logImportedText } from "./file1";
 
 // Number types are declared on variables.
-val items: array = ["first", "second", "third"];
+val items: string[] = ["first", "second", "third"];
+val profile: (string, int, double) = ("Cirilo", 30, 1.80);
 val result: int = (10 + 5) * 2;
 val directNegative: int = -10;
 val negative: int = -(5 + 2);
@@ -153,6 +156,7 @@ print(fallbackText);
 print(status);
 print(computedStatus);
 print(importedText);
+print(profile);
 user.printName();
 User.showLabel();
 logStatus();
@@ -241,7 +245,7 @@ Then open a `.fast` file in the extension development window.
 - numeric variable types are `int`, `float`, and `double`
 - variable declarations can include a type annotation, like `var name: string = "Fast";`
 - variable declarations can infer type from non-null initializers, like `var name = "Fast";`
-- accepted variable types include `array`, `boolean`, `double`, `float`, `int`, `string`, and declared class names
+- accepted variable types include `boolean`, `double`, `float`, `int`, `string`, declared class names, typed arrays like `string[]`, and tuple types like `(string,int)`
 - `null` declarations require an explicit declared type, like `var name: string = null;`
 - named imports use `import { name } from "./file";` and resolve local `.fast` files
 - named exports can be inline, like `export var name = "Fast";`
@@ -251,6 +255,8 @@ Then open a `.fast` file in the extension development window.
 - multiline strings must use `` ` ``
 - line comments start with `//` and run until the end of the line
 - arrays use `[value, value]`
+- array types use `T[]`, like `string[]`
+- tuple types use `(T1, T2, ...)` and tuple literals use `(value1, value2, ...)`
 - `for` loops use `for (var element of array) { ... }`
 - `for` loops can access index with `for (var element, index of array) { ... }`
 - `while` loops use `while (condition) { ... }` and the condition must be boolean

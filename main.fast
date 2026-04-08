@@ -3,7 +3,8 @@ import { importedText, logImportedText } from "./file1";
 // Number types are declared on variables.
 var a: int = 30;
 val b: string = "Test";
-val items: array = ["first", "second", "third"];
+val items: string[] = ["first", "second", "third"];
+val profile: (string, int, double) = ("Cirilo", 30, 1.80);
 val result: int = (10 + 5) * 2;
 val directNegative: int = -10;
 val negative: int = -(5 + 2);
@@ -121,6 +122,7 @@ print(fallbackText);
 print(status);
 print(computedStatus);
 print(importedText);
+print(profile);
 user.printName();
 User.showLabel();
 logStatus();

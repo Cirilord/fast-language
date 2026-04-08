@@ -28,6 +28,7 @@ import type {
   ReturnStatement,
   Statement,
   TypeName,
+  TupleLiteral,
   UnaryExpression,
   VariableDeclaration,
   WhileStatement,
@@ -61,9 +62,100 @@ function isNumericType(type: SemanticType): type is NumberLiteralType {
   return type === 'double' || type === 'float' || type === 'int';
 }
 
+function isArrayType(type: SemanticType): boolean {
+  return typeof type === 'string' && type.endsWith('[]');
+}
+
+function isTupleType(type: SemanticType): boolean {
+  return typeof type === 'string' && type.startsWith('(') && type.endsWith(')');
+}
+
+function splitTupleTypes(type: string): string[] {
+  const content = type.slice(1, -1);
+
+  if (content.trim() === '') {
+    return [];
+  }
+
+  const parts: string[] = [];
+  let current = '';
+  let bracketDepth = 0;
+  let parenDepth = 0;
+
+  for (const char of content) {
+    if (char === ',' && bracketDepth === 0 && parenDepth === 0) {
+      parts.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    if (char === '[') {
+      bracketDepth += 1;
+    } else if (char === ']') {
+      bracketDepth -= 1;
+    } else if (char === '(') {
+      parenDepth += 1;
+    } else if (char === ')') {
+      parenDepth -= 1;
+    }
+
+    current += char;
+  }
+
+  parts.push(current.trim());
+  return parts;
+}
+
+function getArrayElementType(type: string): string {
+  return type.slice(0, -2);
+}
+
+function getWiderType(leftType: SemanticType, rightType: SemanticType): SemanticType | undefined {
+  if (leftType === rightType) {
+    return leftType;
+  }
+
+  if (leftType === 'null') {
+    return rightType;
+  }
+
+  if (rightType === 'null') {
+    return leftType;
+  }
+
+  if (isNumericType(leftType) && isNumericType(rightType)) {
+    return promoteNumericType(leftType, rightType);
+  }
+
+  if (isArrayType(leftType) && isArrayType(rightType)) {
+    const elementType = getWiderType(getArrayElementType(leftType), getArrayElementType(rightType));
+    return elementType === undefined ? undefined : `${elementType}[]`;
+  }
+
+  return undefined;
+}
+
 function areTypesCompatible(expectedType: SemanticType, actualType: SemanticType): boolean {
   if (actualType === 'null' || actualType === 'unknown' || expectedType === actualType) {
     return true;
+  }
+
+  if (expectedType === 'array') {
+    return actualType === 'array' || actualType === 'unknown[]' || isArrayType(actualType);
+  }
+
+  if (isArrayType(expectedType) && isArrayType(actualType)) {
+    return areTypesCompatible(getArrayElementType(expectedType), getArrayElementType(actualType));
+  }
+
+  if (isTupleType(expectedType) && isTupleType(actualType)) {
+    const expectedTypes = splitTupleTypes(expectedType);
+    const actualTypes = splitTupleTypes(actualType);
+
+    return (
+      expectedTypes.length === actualTypes.length &&
+      expectedTypes.every((type, index) => areTypesCompatible(type, actualTypes[index] ?? 'unknown'))
+    );
   }
 
   return expectedType === 'float' && actualType === 'double';
@@ -202,11 +294,32 @@ export class SemanticAnalyzer {
   }
 
   private analyzeArrayLiteral(expression: ArrayLiteral): SemanticType {
-    for (const element of expression.elements) {
-      this.analyzeExpression(element);
+    if (expression.elements.length === 0) {
+      return 'unknown[]';
     }
 
-    return 'array';
+    const [firstElement, ...restElements] = expression.elements;
+
+    if (firstElement === undefined) {
+      throw createTypeError('Unexpected empty array literal');
+    }
+
+    let elementType = this.analyzeExpression(firstElement);
+
+    for (const element of restElements) {
+      const currentType = this.analyzeExpression(element);
+      const widerType = getWiderType(elementType, currentType);
+
+      if (widerType === undefined) {
+        throw createTypeError(
+          `Array literal elements must have compatible types, got '${elementType}' and '${currentType}'`
+        );
+      }
+
+      elementType = widerType;
+    }
+
+    return `${elementType}[]`;
   }
 
   private analyzeAssignmentStatement(statement: AssignmentStatement): void {
@@ -669,6 +782,8 @@ export class SemanticAnalyzer {
         return this.analyzeSuperExpression();
       case 'ThisExpression':
         return this.analyzeThisExpression();
+      case 'TupleLiteral':
+        return this.analyzeTupleLiteral(expression);
       case 'UnaryExpression':
         return this.analyzeUnaryExpression(expression);
     }
@@ -681,9 +796,12 @@ export class SemanticAnalyzer {
   private analyzeForStatement(statement: ForStatement): void {
     const iterableType = this.analyzeExpression(statement.iterable);
 
-    if (iterableType !== 'array' && iterableType !== 'unknown') {
+    if (iterableType !== 'array' && !isArrayType(iterableType) && iterableType !== 'unknown') {
       throw createTypeError('For loop iterable must be an array', statement.element.location);
     }
+
+    const elementType =
+      iterableType === 'array' || iterableType === 'unknown' ? 'unknown' : getArrayElementType(iterableType);
 
     this.withScope(() => {
       this.scope.define(
@@ -691,7 +809,7 @@ export class SemanticAnalyzer {
           callable: false,
           mutable: true,
           name: statement.element.name,
-          type: 'unknown',
+          type: elementType,
         },
         statement.element.location
       );
@@ -932,6 +1050,10 @@ export class SemanticAnalyzer {
 
   private analyzeThisExpression(): SemanticType {
     return this.requireCurrentClass('this').identifier.name;
+  }
+
+  private analyzeTupleLiteral(expression: TupleLiteral): SemanticType {
+    return `(${expression.elements.map((element) => this.analyzeExpression(element)).join(',')})`;
   }
 
   private analyzeUnaryExpression(expression: UnaryExpression): SemanticType {

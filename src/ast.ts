@@ -159,6 +159,7 @@ export type Expression =
   | StringLiteral
   | SuperExpression
   | ThisExpression
+  | TupleLiteral
   | UnaryExpression;
 
 export type ArrayLiteral = {
@@ -225,6 +226,11 @@ export type SuperExpression = {
 
 export type ThisExpression = {
   kind: 'ThisExpression';
+};
+
+export type TupleLiteral = {
+  elements: Expression[];
+  kind: 'TupleLiteral';
 };
 
 export type UnaryExpression = {

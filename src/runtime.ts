@@ -28,6 +28,7 @@ import type {
   Statement,
   StringLiteral,
   TypeName,
+  TupleLiteral,
   UnaryExpression,
   VariableDeclaration,
   WhileStatement,
@@ -104,6 +105,11 @@ export type StringValue = {
   value: string;
 };
 
+export type TupleValue = {
+  elements: RuntimeValue[];
+  type: 'tuple';
+};
+
 export type UserFunctionValue = {
   body: Statement[];
   closure: Scope;
@@ -124,6 +130,7 @@ export type RuntimeValue =
   | NumberValue
   | StringValue
   | SuperValue
+  | TupleValue
   | UserFunctionValue;
 
 export type RuntimeModuleExports = ReadonlyMap<string, RuntimeValue>;
@@ -182,6 +189,15 @@ function areRuntimeValuesEqual(left: RuntimeValue, right: RuntimeValue): boolean
       return right.type === 'string' && left.value === right.value;
     case 'super':
       return left === right;
+    case 'tuple':
+      return (
+        right.type === 'tuple' &&
+        left.elements.length === right.elements.length &&
+        left.elements.every((element, index) => {
+          const rightElement = right.elements[index];
+          return rightElement !== undefined && areRuntimeValuesEqual(element, rightElement);
+        })
+      );
   }
 }
 
@@ -838,6 +854,8 @@ export class Interpreter {
         return this.scope.lookup('super');
       case 'ThisExpression':
         return this.scope.lookup('this');
+      case 'TupleLiteral':
+        return this.evaluateTupleLiteral(expression);
       case 'UnaryExpression':
         return this.evaluateUnaryExpression(expression);
     }
@@ -969,6 +987,13 @@ export class Interpreter {
     return {
       type: 'string',
       value: expression.value,
+    };
+  }
+
+  private evaluateTupleLiteral(expression: TupleLiteral): RuntimeValue {
+    return {
+      elements: expression.elements.map((element) => this.evaluateExpression(element)),
+      type: 'tuple',
     };
   }
 
@@ -1222,6 +1247,8 @@ export class Interpreter {
         return value.value;
       case 'super':
         return '<super>';
+      case 'tuple':
+        return `(${value.elements.map((element) => this.runtimeValueToString(element)).join(', ')})`;
     }
   }
 

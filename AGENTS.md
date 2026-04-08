@@ -32,13 +32,14 @@ This file tracks working conventions for the `fast` language project so future c
 - Integer literals do not use decimal points, like `10`; decimal literals use decimal points, like `20.0`.
 - Variable declarations can include a type annotation, like `var name: string = "Fast";`.
 - Variable declarations can infer type from non-null initializers, like `var name = "Fast";`.
-- Accepted variable types include `array`, `boolean`, `double`, `float`, `int`, `string`, and declared class names.
+- Accepted variable types include `boolean`, `double`, `float`, `int`, `string`, declared class names, typed arrays like `string[]`, and tuple types like `(string,int)`.
 - `null` declarations require an explicit declared type, like `var name: string = null;`.
 - `print` is not a lexer keyword; it is tokenized as `IDENTIFIER`.
 - Normal strings use `"`.
 - Multiline strings use `` ` ``.
 - Line comments start with `//` and run until the end of the line.
-- Arrays use `[value, value]`.
+- Arrays use `[value, value]`, and array types use `T[]`, like `string[]`.
+- Tuple types use `(T1, T2, ...)`, and tuple literals use `(value1, value2, ...)`.
 - `for` loops use `for (var element of array) { ... }`.
 - `for` loops can access index with `for (var element, index of array) { ... }`.
 - `while` loops use `while (condition) { ... }`, and the condition must be boolean.

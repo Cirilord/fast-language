@@ -31,6 +31,7 @@ import type {
   Statement,
   StringLiteral,
   TypeName,
+  TupleLiteral,
   UnaryExpression,
   UnaryOperator,
   VariableDeclaration,
@@ -115,20 +116,12 @@ export class Parser {
     });
   }
 
-  private getFunctionReturnType(token: Token): FunctionReturnType {
-    if (token.lexeme === 'void') {
-      return 'void';
+  private getTypeName(typeName: string): TypeName {
+    if (typeName === 'void') {
+      throw createSyntaxError("'void' can only be used as a function return type.");
     }
 
-    return this.getTypeName(token);
-  }
-
-  private getTypeName(token: Token): TypeName {
-    if (token.lexeme === 'void') {
-      throw this.error(token, "'void' can only be used as a function return type.");
-    }
-
-    return token.lexeme;
+    return typeName;
   }
 
   private isAssignmentOperatorToken(type: TokenType): boolean {
@@ -324,7 +317,7 @@ export class Parser {
       const declarationType = this.previous().lexeme as 'var' | 'val';
       const name = this.consume(TokenType.Identifier, 'Expected property name.');
       this.consume(TokenType.Colon, "Expected ':' after property name.");
-      const type = this.consume(TokenType.Identifier, "Expected property type after ':'.");
+      const typeAnnotation = this.parseTypeName();
       this.consume(TokenType.Equals, "Expected '=' after property type.");
       const initializer = this.parseExpression();
       this.consume(TokenType.Semicolon, "Expected ';' after property declaration.");
@@ -336,7 +329,7 @@ export class Parser {
         kind: 'ClassProperty',
         name: this.createIdentifier(name),
         static: isStatic,
-        typeAnnotation: this.getTypeName(type),
+        typeAnnotation,
       } satisfies ClassProperty;
     }
 
@@ -347,7 +340,6 @@ export class Parser {
     if (this.match(TokenType.LeftParen)) {
       const parameters = this.parseParameters();
       this.consume(TokenType.Colon, "Expected ':' after method parameters.");
-      const returnType = this.consume(TokenType.Identifier, "Expected method return type after ':'.");
 
       const method: ClassMethod = {
         access,
@@ -355,7 +347,7 @@ export class Parser {
         name: this.createIdentifier(name),
         override: isOverride,
         parameters,
-        returnType: this.getFunctionReturnType(returnType),
+        returnType: this.parseFunctionReturnType(),
         static: isStatic,
         virtual: isVirtual,
       };
@@ -540,15 +532,24 @@ export class Parser {
     this.consume(TokenType.LeftParen, "Expected '(' after function name.");
     const parameters = this.parseParameters();
     this.consume(TokenType.Colon, "Expected ':' after function parameters.");
-    const returnType = this.consume(TokenType.Identifier, "Expected return type after ':'.");
+    const returnType = this.parseFunctionReturnType();
 
     return {
       body: this.parseBlockStatement(),
       identifier: this.createIdentifier(name),
       kind: 'FunctionDeclaration',
       parameters,
-      returnType: this.getFunctionReturnType(returnType),
+      returnType,
     };
+  }
+
+  private parseFunctionReturnType(): FunctionReturnType {
+    if (this.check(TokenType.Identifier) && this.peek().lexeme === 'void') {
+      this.advance();
+      return 'void';
+    }
+
+    return this.parseTypeName();
   }
 
   private parseImportDeclaration(): ImportDeclaration {
@@ -654,12 +655,11 @@ export class Parser {
       do {
         const name = this.consume(TokenType.Identifier, 'Expected parameter name.');
         this.consume(TokenType.Colon, "Expected ':' after parameter name.");
-        const type = this.consume(TokenType.Identifier, "Expected parameter type after ':'.");
 
         const parameter: Parameter = {
           identifier: this.createIdentifier(name),
           kind: 'Parameter',
-          typeAnnotation: this.getTypeName(type),
+          typeAnnotation: this.parseTypeName(),
         };
 
         if (this.match(TokenType.Equals)) {
@@ -679,9 +679,25 @@ export class Parser {
 
   private parsePrimary(): Expression {
     if (this.match(TokenType.LeftParen)) {
-      const expression = this.parseExpression();
-      this.consume(TokenType.RightParen, "Expected ')' after grouped expression.");
-      return expression;
+      const first = this.parseExpression();
+
+      if (!this.match(TokenType.Comma)) {
+        this.consume(TokenType.RightParen, "Expected ')' after grouped expression.");
+        return first;
+      }
+
+      const elements: Expression[] = [first];
+
+      do {
+        elements.push(this.parseExpression());
+      } while (this.match(TokenType.Comma));
+
+      this.consume(TokenType.RightParen, "Expected ')' after tuple literal.");
+
+      return {
+        elements,
+        kind: 'TupleLiteral',
+      } satisfies TupleLiteral;
     }
 
     if (this.match(TokenType.LeftBracket)) {
@@ -822,6 +838,34 @@ export class Parser {
     return expression;
   }
 
+  private parseTypeName(): TypeName {
+    if (this.match(TokenType.LeftParen)) {
+      const types: TypeName[] = [this.parseTypeName()];
+
+      while (this.match(TokenType.Comma)) {
+        types.push(this.parseTypeName());
+      }
+
+      this.consume(TokenType.RightParen, "Expected ')' after tuple type.");
+
+      if (types.length < 2) {
+        throw this.error(this.previous(), 'Tuple types must contain at least two elements.');
+      }
+
+      return `(${types.join(',')})`;
+    }
+
+    const type = this.consume(TokenType.Identifier, 'Expected type name.');
+    let typeName = this.getTypeName(type.lexeme);
+
+    while (this.match(TokenType.LeftBracket)) {
+      this.consume(TokenType.RightBracket, "Expected ']' after array type.");
+      typeName = `${typeName}[]`;
+    }
+
+    return typeName;
+  }
+
   private parseUnaryExpression(): Expression {
     if (this.match(TokenType.Minus)) {
       const operator = this.previous().lexeme as UnaryOperator;
@@ -838,9 +882,7 @@ export class Parser {
 
   private parseVariableDeclaration(declarationType: 'var' | 'val'): VariableDeclaration {
     const name = this.consume(TokenType.Identifier, `Expected identifier after '${declarationType}'.`);
-    const type = this.match(TokenType.Colon)
-      ? this.consume(TokenType.Identifier, "Expected type name after ':'.")
-      : undefined;
+    const type = this.match(TokenType.Colon) ? this.parseTypeName() : undefined;
 
     this.consume(TokenType.Equals, "Expected '=' after variable name.");
     const initializer = this.parseExpression();
@@ -854,7 +896,7 @@ export class Parser {
     };
 
     if (type !== undefined) {
-      declaration.typeAnnotation = this.getTypeName(type);
+      declaration.typeAnnotation = type;
     }
 
     return declaration;
