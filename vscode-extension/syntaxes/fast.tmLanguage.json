@@ -187,6 +187,10 @@
           "match": "\\b(?:do|for|while)\\b"
         },
         {
+          "name": "keyword.control.exception.ts",
+          "match": "\\b(?:except|finally|throw|try)\\b"
+        },
+        {
           "name": "keyword.operator.expression.of.ts",
           "match": "\\bof\\b"
         },

@@ -18,6 +18,8 @@ Right now the project is implemented in TypeScript and already supports:
 - generic functions and classes with type parameters like `<T, K = string>`
 - `void` functions with `function name(): void { ... }`
 - named functions expose implicit `name` and `toString()`, and `print(functionName)` uses the function string representation
+- `throw` statements with class-based errors that extend `Error`
+- `try { ... } except(error: ErrorType) { ... } finally { ... }`
 - classes with mandatory access modifiers and `var`/`val` property mutability
 - `abstract virtual class` contracts with `implements`
 - semantic checks for class member access, inherited overrides, virtual methods, and constructor visibility
@@ -150,6 +152,12 @@ class Box<T, K = string> {
   }
 }
 
+class AppError extends Error {
+  public constructor(message: string) {
+    super(message);
+  }
+}
+
 val computedStatus: string = getStatus();
 val genericStatus: string = identity<string>(status);
 val importedStatus: string = logGenericText<string>("Imported generic text", status);
@@ -214,6 +222,18 @@ User.showLabel();
 logStatus();
 logAll("values", "alpha", "beta", "gamma");
 logImportedText();
+
+try {
+  throw new AppError("App failed");
+} except(error: TypeError) {
+  print("type error");
+} except(error: AppError) {
+  print(error.message);
+} except(error: Error) {
+  print("generic error");
+} finally {
+  print("finally");
+}
 ```
 
 `file1.fast`
@@ -319,6 +339,9 @@ Then open a `.fast` file in the extension development window.
 - function return values must match the declared return type
 - functions that do not return a value use `void`, like `function name(): void { ... }`
 - named functions expose implicit `name` and `toString()`, like `logGenericText.name` and `logGenericText.toString()`
+- `throw value;` requires a value whose class extends `Error`
+- `try` statements require at least one `except(error: ErrorType)` block, and may optionally end with `finally`
+- duplicate `except` types are rejected, and broader earlier `except` clauses make narrower later ones unreachable
 - classes use `class Name { ... }`
 - abstract virtual contracts use `abstract virtual class Name { ... }`
 - classes can extend one base class with `extends` and implement abstract virtual contracts with `implements`
@@ -335,6 +358,7 @@ Then open a `.fast` file in the extension development window.
 - subclass constructors must start with `super()` when extending a base class
 - objects are created with `new Name()` and members are accessed with `.`
 - `this` is available in constructors and methods, and `super()`/`super.method()` are available in subclasses
+- builtin error classes include `Error`, `TypeError`, and `ReferenceError`
 - `print` is treated as an identifier in the lexer and as a builtin at runtime
 - symbol existence, callability, and `val` reassignment are checked semantically before execution
 

@@ -51,6 +51,9 @@ This file tracks working conventions for the `fast` language project so future c
 - Function return values must match the declared return type.
 - Functions that do not return a value use `void`, like `function name(): void { ... }`.
 - Named functions expose implicit `name` and `toString()`, like `logGenericText.name` and `logGenericText.toString()`.
+- `throw value;` requires a value whose class extends `Error`.
+- `try { ... } except(error: ErrorType) { ... } finally { ... }` is supported.
+- `try` requires at least one `except`, `finally` is optional, duplicate `except` types are rejected, and broader earlier `except` clauses make narrower later ones unreachable.
 - Classes use `class Name { ... }`.
 - Generic classes use `class Name<T, K = string> { ... }`.
 - Every class has an implicit static `name: string`, accessible like `BaseName.name` or `this.constructor.name`.
@@ -70,6 +73,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Subclass constructors must start with `super()` when extending a base class.
 - Objects are created with `new Name()` and members are accessed with `.`.
 - `this` is available in constructors and methods, and `super()`/`super.method()` are available in subclasses.
+- Builtin error classes include `Error`, `TypeError`, and `ReferenceError`.
 - Named imports use `import { name } from "./file";` and resolve local `.fast` files.
 - Named exports can be inline, like `export var name = "Fast";`.
 - Named exports can reference existing bindings, like `export name;`.

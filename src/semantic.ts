@@ -11,6 +11,7 @@ import type {
   ClassProperty,
   ConditionalExpression,
   DoWhileStatement,
+  ExceptClause,
   ExportDeclaration,
   Expression,
   ExpressionStatement,
@@ -27,13 +28,16 @@ import type {
   Program,
   ReturnStatement,
   Statement,
+  ThrowStatement,
   TypeParameter,
   TypeName,
+  TryStatement,
   TupleLiteral,
   UnaryExpression,
   VariableDeclaration,
   WhileStatement,
 } from './ast';
+import { getBuiltinClassDeclarations } from './builtins';
 import { createReferenceError, createSyntaxError, createTypeError } from './errors';
 
 export type SemanticType = 'function' | 'null' | 'void' | TypeName | 'unknown';
@@ -399,6 +403,10 @@ export class SemanticAnalyzer {
       returnType: 'unknown',
       type: 'function',
     });
+
+    for (const builtinClass of getBuiltinClassDeclarations()) {
+      this.analyzeClassDeclaration(builtinClass);
+    }
   }
 
   public analyze(program: Program): void {
@@ -1362,6 +1370,9 @@ export class SemanticAnalyzer {
       case 'DoWhileStatement':
         this.analyzeDoWhileStatement(statement);
         return;
+      case 'ThrowStatement':
+        this.analyzeThrowStatement(statement);
+        return;
       case 'ExportDeclaration':
         this.analyzeExportDeclaration(statement);
         return;
@@ -1379,6 +1390,9 @@ export class SemanticAnalyzer {
         return;
       case 'ReturnStatement':
         this.analyzeReturnStatement(statement);
+        return;
+      case 'TryStatement':
+        this.analyzeTryStatement(statement);
         return;
       case 'VariableDeclaration':
         this.analyzeVariableDeclaration(statement);
@@ -1405,6 +1419,57 @@ export class SemanticAnalyzer {
 
   private analyzeThisExpression(): SemanticType {
     return this.requireCurrentClass('this').identifier.name;
+  }
+
+  private analyzeThrowStatement(statement: ThrowStatement): void {
+    const thrownType = this.analyzeExpression(statement.value);
+    const thrownClass = this.getClassDeclaration({
+      kind: 'Identifier',
+      location: this.getExpressionLocation(statement.value),
+      name: thrownType,
+    });
+
+    if (!this.isSameOrSubclass(thrownClass, this.getErrorBaseClass())) {
+      throw createTypeError(`Thrown value must extend 'Error', got '${thrownType}'`);
+    }
+  }
+
+  private analyzeTryStatement(statement: TryStatement): void {
+    this.validateExceptClauses(statement.exceptClauses);
+
+    this.withScope(() => {
+      for (const bodyStatement of statement.body) {
+        this.analyzeStatement(bodyStatement);
+      }
+    });
+
+    for (const exceptClause of statement.exceptClauses) {
+      this.withScope(() => {
+        this.scope.define(
+          {
+            callable: false,
+            mutable: false,
+            name: exceptClause.identifier.name,
+            type: exceptClause.errorType,
+          },
+          exceptClause.identifier.location
+        );
+
+        for (const bodyStatement of exceptClause.body) {
+          this.analyzeStatement(bodyStatement);
+        }
+      });
+    }
+
+    const finallyBody = statement.finallyBody;
+
+    if (finallyBody !== undefined) {
+      this.withScope(() => {
+        for (const bodyStatement of finallyBody) {
+          this.analyzeStatement(bodyStatement);
+        }
+      });
+    }
   }
 
   private analyzeTupleLiteral(expression: TupleLiteral): SemanticType {
@@ -1760,6 +1825,33 @@ export class SemanticAnalyzer {
     return statement.members.find((member): member is ClassConstructor => member.kind === 'ClassConstructor');
   }
 
+  private getErrorBaseClass(): ClassDeclaration {
+    return this.getClassDeclaration({
+      kind: 'Identifier',
+      location: {
+        column: 1,
+        line: 1,
+      },
+      name: 'Error',
+    });
+  }
+
+  private getExpressionLocation(expression: Expression): Identifier['location'] {
+    switch (expression.kind) {
+      case 'Identifier':
+        return expression.location;
+      case 'MemberExpression':
+        return expression.property.location;
+      case 'NewExpression':
+        return expression.callee.location;
+      default:
+        return {
+          column: 1,
+          line: 1,
+        };
+    }
+  }
+
   private getInheritedMethod(statement: ClassDeclaration, name: string, isStatic: boolean): ClassMethod | undefined {
     if (statement.baseClass === undefined) {
       return undefined;
@@ -1906,6 +1998,20 @@ export class SemanticAnalyzer {
         this.hasReturnStatement(statement.body)
       ) {
         return true;
+      }
+
+      if (statement.kind === 'TryStatement') {
+        if (this.hasReturnStatement(statement.body)) {
+          return true;
+        }
+
+        if (statement.exceptClauses.some((exceptClause) => this.hasReturnStatement(exceptClause.body))) {
+          return true;
+        }
+
+        if (statement.finallyBody !== undefined && this.hasReturnStatement(statement.finallyBody)) {
+          return true;
+        }
       }
     }
 
@@ -2061,6 +2167,42 @@ export class SemanticAnalyzer {
 
     this.ensureMemberIsAccessible(member, expression.property.location);
     return member;
+  }
+
+  private validateExceptClauses(exceptClauses: ExceptClause[]): void {
+    const errorBaseClass = this.getErrorBaseClass();
+    const seenClasses: ClassDeclaration[] = [];
+
+    for (const exceptClause of exceptClauses) {
+      const errorClass = this.getClassDeclaration({
+        kind: 'Identifier',
+        location: exceptClause.identifier.location,
+        name: exceptClause.errorType,
+      });
+
+      if (!this.isSameOrSubclass(errorClass, errorBaseClass)) {
+        throw createTypeError(
+          `Except type '${exceptClause.errorType}' must extend 'Error'`,
+          exceptClause.identifier.location
+        );
+      }
+
+      if (seenClasses.some((seenClass) => seenClass.identifier.name === errorClass.identifier.name)) {
+        throw createTypeError(
+          `Except type '${exceptClause.errorType}' is already handled`,
+          exceptClause.identifier.location
+        );
+      }
+
+      if (seenClasses.some((seenClass) => this.isSameOrSubclass(errorClass, seenClass))) {
+        throw createTypeError(
+          `Except type '${exceptClause.errorType}' is unreachable because it is already covered by an earlier except`,
+          exceptClause.identifier.location
+        );
+      }
+
+      seenClasses.push(errorClass);
+    }
   }
 
   private withScope(callback: () => void): void {

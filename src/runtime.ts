@@ -11,6 +11,7 @@ import type {
   ClassProperty,
   ConditionalExpression,
   DoWhileStatement,
+  ExceptClause,
   ExportDeclaration,
   Expression,
   ForStatement,
@@ -27,13 +28,16 @@ import type {
   ReturnStatement,
   Statement,
   StringLiteral,
+  ThrowStatement,
   TypeParameter,
   TypeName,
+  TryStatement,
   TupleLiteral,
   UnaryExpression,
   VariableDeclaration,
   WhileStatement,
 } from './ast';
+import { getBuiltinClassDeclarations } from './builtins';
 import { createReferenceError, createTypeError } from './errors';
 
 type Binding = {
@@ -141,6 +145,10 @@ export type RuntimeModuleExports = ReadonlyMap<string, RuntimeValue>;
 export type RuntimeImportResolver = (source: string) => RuntimeModuleExports;
 
 class ReturnSignal {
+  public constructor(public readonly value: RuntimeValue) {}
+}
+
+class ThrowSignal {
   public constructor(public readonly value: RuntimeValue) {}
 }
 
@@ -370,6 +378,24 @@ function getMinimumArity(parameters: Parameter[]): number {
   return parameters.filter((parameter) => parameter.defaultValue === undefined && !parameter.rest).length;
 }
 
+function getTypeBaseName(typeName: TypeName): string {
+  const genericStart = typeName.indexOf('<');
+
+  return genericStart === -1 ? typeName : typeName.slice(0, genericStart);
+}
+
+function isSameClassOrSubclass(candidate: ClassValue, base: ClassValue): boolean {
+  if (candidate.name === base.name) {
+    return true;
+  }
+
+  if (candidate.baseClass === undefined) {
+    return false;
+  }
+
+  return isSameClassOrSubclass(candidate.baseClass, base);
+}
+
 function hasRestParameter(parameters: Parameter[]): boolean {
   return parameters.some((parameter) => parameter.rest);
 }
@@ -393,6 +419,10 @@ export class Interpreter {
       },
       false
     );
+
+    for (const builtinClass of getBuiltinClassDeclarations()) {
+      this.executeClassDeclaration(builtinClass);
+    }
   }
 
   public execute(program: Program): RuntimeValue {
@@ -1262,6 +1292,8 @@ export class Interpreter {
         return this.executeClassDeclaration(statement);
       case 'DoWhileStatement':
         return this.executeDoWhileStatement(statement);
+      case 'ThrowStatement':
+        return this.executeThrowStatement(statement);
       case 'ExportDeclaration':
         return this.executeExportDeclaration(statement);
       case 'ExpressionStatement':
@@ -1274,11 +1306,102 @@ export class Interpreter {
         return this.executeImportDeclaration(statement);
       case 'ReturnStatement':
         return this.executeReturnStatement(statement);
+      case 'TryStatement':
+        return this.executeTryStatement(statement);
       case 'VariableDeclaration':
         return this.executeVariableDeclaration(statement);
       case 'WhileStatement':
         return this.executeWhileStatement(statement);
     }
+  }
+
+  private executeThrowStatement(statement: ThrowStatement): RuntimeValue {
+    const value = this.evaluateExpression(statement.value);
+
+    if (value.type !== 'instance' || !isSameClassOrSubclass(value.classValue, this.getErrorClassValue())) {
+      throw createTypeError(`Thrown value must extend 'Error', got '${value.type}'`);
+    }
+
+    throw new ThrowSignal(value);
+  }
+
+  private executeTryStatement(statement: TryStatement): RuntimeValue {
+    let completionSignal: ReturnSignal | ThrowSignal | undefined;
+    let lastValue: RuntimeValue = { type: 'null', value: null };
+
+    try {
+      lastValue = this.withScope(() => {
+        let bodyValue: RuntimeValue = { type: 'null', value: null };
+
+        for (const bodyStatement of statement.body) {
+          bodyValue = this.executeStatement(bodyStatement);
+        }
+
+        return bodyValue;
+      });
+    } catch (error) {
+      if (!(error instanceof ThrowSignal)) {
+        completionSignal = error instanceof ReturnSignal ? error : undefined;
+
+        if (completionSignal === undefined) {
+          throw error;
+        }
+      } else {
+        const matchedClause = this.findMatchingExceptClause(statement.exceptClauses, error.value);
+
+        if (matchedClause === undefined) {
+          completionSignal = error;
+        } else {
+          try {
+            lastValue = this.withScope(() => {
+              this.scope.define(matchedClause.identifier.name, error.value, false, matchedClause.errorType);
+
+              let bodyValue: RuntimeValue = { type: 'null', value: null };
+
+              for (const bodyStatement of matchedClause.body) {
+                bodyValue = this.executeStatement(bodyStatement);
+              }
+
+              return bodyValue;
+            });
+          } catch (exceptError) {
+            if (exceptError instanceof ReturnSignal || exceptError instanceof ThrowSignal) {
+              completionSignal = exceptError;
+            } else {
+              throw exceptError;
+            }
+          }
+        }
+      }
+    }
+
+    const finallyBody = statement.finallyBody;
+
+    if (finallyBody !== undefined) {
+      try {
+        lastValue = this.withScope(() => {
+          let bodyValue: RuntimeValue = { type: 'null', value: null };
+
+          for (const bodyStatement of finallyBody) {
+            bodyValue = this.executeStatement(bodyStatement);
+          }
+
+          return bodyValue;
+        });
+      } catch (finallyError) {
+        if (finallyError instanceof ReturnSignal || finallyError instanceof ThrowSignal) {
+          completionSignal = finallyError;
+        } else {
+          throw finallyError;
+        }
+      }
+    }
+
+    if (completionSignal !== undefined) {
+      throw completionSignal;
+    }
+
+    return lastValue;
   }
 
   private executeVariableDeclaration(statement: VariableDeclaration): RuntimeValue {
@@ -1318,6 +1441,36 @@ export class Interpreter {
     }
 
     return lastValue;
+  }
+
+  private findMatchingExceptClause(exceptClauses: ExceptClause[], thrownValue: RuntimeValue): ExceptClause | undefined {
+    if (thrownValue.type !== 'instance') {
+      return undefined;
+    }
+
+    for (const exceptClause of exceptClauses) {
+      const errorClass = this.lookupClassValue(exceptClause.errorType);
+
+      if (isSameClassOrSubclass(thrownValue.classValue, errorClass)) {
+        return exceptClause;
+      }
+    }
+
+    return undefined;
+  }
+
+  private getErrorClassValue(): ClassValue {
+    return this.lookupClassValue('Error');
+  }
+
+  private lookupClassValue(typeName: TypeName): ClassValue {
+    const classValue = this.scope.lookup(getTypeBaseName(typeName));
+
+    if (classValue.type !== 'class') {
+      throw createTypeError(`Binding '${typeName}' is not a class`);
+    }
+
+    return classValue;
   }
 
   private renderClassValue(classValue: ClassValue): string {

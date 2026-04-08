@@ -7,12 +7,14 @@ export type Statement =
   | AssignmentStatement
   | ClassDeclaration
   | DoWhileStatement
+  | ThrowStatement
   | ExportDeclaration
   | ExpressionStatement
   | ForStatement
   | FunctionDeclaration
   | ImportDeclaration
   | ReturnStatement
+  | TryStatement
   | VariableDeclaration
   | WhileStatement;
 
@@ -44,6 +46,11 @@ export type DoWhileStatement = {
   body: Statement[];
   condition: Expression;
   kind: 'DoWhileStatement';
+};
+
+export type ThrowStatement = {
+  kind: 'ThrowStatement';
+  value: Expression;
 };
 
 export type ExportableDeclaration = ClassDeclaration | FunctionDeclaration | VariableDeclaration;
@@ -124,6 +131,13 @@ export type ReturnStatement = {
   value?: Expression;
 };
 
+export type ExceptClause = {
+  body: Statement[];
+  errorType: TypeName;
+  identifier: Identifier;
+  kind: 'ExceptClause';
+};
+
 export type VariableDeclaration = {
   declarationType: 'var' | 'val';
   identifier: Identifier;
@@ -136,6 +150,13 @@ export type TypeParameter = {
   defaultType?: TypeName;
   identifier: Identifier;
   kind: 'TypeParameter';
+};
+
+export type TryStatement = {
+  body: Statement[];
+  exceptClauses: ExceptClause[];
+  finallyBody?: Statement[];
+  kind: 'TryStatement';
 };
 
 export type WhileStatement = {

@@ -13,6 +13,7 @@ import type {
   ClassProperty,
   ConditionalExpression,
   DoWhileStatement,
+  ExceptClause,
   ExportDeclaration,
   Expression,
   ExpressionStatement,
@@ -30,9 +31,11 @@ import type {
   ReturnStatement,
   Statement,
   StringLiteral,
+  ThrowStatement,
   TupleLiteral,
   TypeName,
   TypeParameter,
+  TryStatement,
   UnaryExpression,
   UnaryOperator,
   VariableDeclaration,
@@ -446,6 +449,21 @@ export class Parser {
     return expression;
   }
 
+  private parseExceptClause(): ExceptClause {
+    this.consume(TokenType.LeftParen, "Expected '(' after 'except'.");
+    const identifier = this.consume(TokenType.Identifier, 'Expected error binding name.');
+    this.consume(TokenType.Colon, "Expected ':' after error binding.");
+    const errorType = this.parseTypeName();
+    this.consume(TokenType.RightParen, "Expected ')' after except binding.");
+
+    return {
+      body: this.parseBlockStatement(),
+      errorType,
+      identifier: this.createIdentifier(identifier),
+      kind: 'ExceptClause',
+    };
+  }
+
   private parseExportDeclaration(): ExportDeclaration {
     if (this.match(TokenType.Var)) {
       return {
@@ -770,7 +788,6 @@ export class Parser {
 
     throw this.error(this.peek(), 'Expected expression.');
   }
-
   private parseReturnStatement(): ReturnStatement {
     if (this.match(TokenType.Semicolon)) {
       return {
@@ -828,6 +845,14 @@ export class Parser {
       return this.parseReturnStatement();
     }
 
+    if (this.match(TokenType.Throw)) {
+      return this.parseThrowStatement();
+    }
+
+    if (this.match(TokenType.Try)) {
+      return this.parseTryStatement();
+    }
+
     if (this.match(TokenType.While)) {
       return this.parseWhileStatement();
     }
@@ -865,6 +890,41 @@ export class Parser {
     }
 
     return expression;
+  }
+
+  private parseThrowStatement(): ThrowStatement {
+    const value = this.parseExpression();
+    this.consume(TokenType.Semicolon, "Expected ';' after thrown value.");
+
+    return {
+      kind: 'ThrowStatement',
+      value,
+    };
+  }
+
+  private parseTryStatement(): TryStatement {
+    const body = this.parseBlockStatement();
+    const exceptClauses: ExceptClause[] = [];
+
+    while (this.match(TokenType.Except)) {
+      exceptClauses.push(this.parseExceptClause());
+    }
+
+    if (exceptClauses.length === 0) {
+      throw this.error(this.peek(), "Expected at least one 'except' after try block.");
+    }
+
+    const statement: TryStatement = {
+      body,
+      exceptClauses,
+      kind: 'TryStatement',
+    };
+
+    if (this.match(TokenType.Finally)) {
+      statement.finallyBody = this.parseBlockStatement();
+    }
+
+    return statement;
   }
 
   private parseTypeArguments(): TypeName[] {

@@ -107,6 +107,12 @@ class Box<T, K = string> {
   }
 }
 
+class AppError extends Error {
+  public constructor(message: string) {
+    super(message);
+  }
+}
+
 val computedStatus: string = getStatus();
 val genericStatus: string = identity<string>(status);
 val importedStatus: string = logGenericText<string>("Imported generic text", status);
@@ -178,3 +184,15 @@ logStatusTwice();
 logAll("values", "alpha", "beta", "gamma");
 logStatus("state");
 logImportedText();
+
+try {
+  throw new AppError("App failed");
+} except(error: TypeError) {
+  print("type error");
+} except(error: AppError) {
+  print(error.message);
+} except(error: Error) {
+  print("generic error");
+} finally {
+  print("finally");
+}
