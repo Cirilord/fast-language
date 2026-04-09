@@ -1,4 +1,5 @@
 import type {
+  AnonymousFunctionExpression,
   ArrayLiteral,
   AssignmentOperator,
   AssignmentStatement,
@@ -131,8 +132,54 @@ function isArrayType(type: SemanticType): boolean {
   return typeof type === 'string' && type.endsWith('[]');
 }
 
+function isFunctionType(type: SemanticType): boolean {
+  return typeof type === 'string' && type.startsWith('fn(');
+}
+
 function isTupleType(type: SemanticType): boolean {
   return typeof type === 'string' && type.startsWith('(') && type.endsWith(')');
+}
+
+function buildFunctionType(parameterTypes: TypeName[], returnType: FunctionReturnType): TypeName {
+  return `fn(${parameterTypes.join(',')}):${returnType}`;
+}
+
+function parseFunctionType(type: string): { parameterTypes: TypeName[]; returnType: FunctionReturnType } | undefined {
+  if (!type.startsWith('fn(')) {
+    return undefined;
+  }
+
+  let closeIndex = -1;
+  let nestedParenDepth = 0;
+
+  for (let index = 3; index < type.length; index += 1) {
+    const char = type[index];
+
+    if (char === '(') {
+      nestedParenDepth += 1;
+      continue;
+    }
+
+    if (char === ')') {
+      if (nestedParenDepth === 0) {
+        closeIndex = index;
+        break;
+      }
+
+      nestedParenDepth -= 1;
+    }
+  }
+
+  if (closeIndex === -1 || type.slice(closeIndex + 1, closeIndex + 2) !== ':') {
+    return undefined;
+  }
+
+  const parameterContent = type.slice(3, closeIndex);
+
+  return {
+    parameterTypes: splitTopLevel(parameterContent),
+    returnType: type.slice(closeIndex + 2) as FunctionReturnType,
+  };
 }
 
 function isSwitchComparableType(type: SemanticType): boolean {
@@ -224,6 +271,15 @@ function containsUnknownType(type: string): boolean {
     return true;
   }
 
+  const functionType = parseFunctionType(type);
+
+  if (functionType !== undefined) {
+    return (
+      functionType.returnType === 'unknown' ||
+      functionType.parameterTypes.some((parameterType) => containsUnknownType(parameterType))
+    );
+  }
+
   if (type.endsWith('[]')) {
     return containsUnknownType(getArrayElementType(type));
   }
@@ -269,6 +325,15 @@ function instantiateType(type: string, typeArguments: ReadonlyMap<string, TypeNa
 
   if (type.endsWith('[]')) {
     return `${instantiateType(getArrayElementType(type), typeArguments)}[]`;
+  }
+
+  const functionType = parseFunctionType(type);
+
+  if (functionType !== undefined) {
+    return buildFunctionType(
+      functionType.parameterTypes.map((parameterType) => instantiateType(parameterType, typeArguments)),
+      functionType.returnType === 'void' ? 'void' : instantiateType(functionType.returnType, typeArguments)
+    );
   }
 
   if (isTupleType(type)) {
@@ -402,6 +467,21 @@ function areTypesCompatible(expectedType: SemanticType, actualType: SemanticType
 
   if (isArrayType(expectedType) && isArrayType(actualType)) {
     return areTypesCompatible(getArrayElementType(expectedType), getArrayElementType(actualType));
+  }
+
+  if (isFunctionType(expectedType) && isFunctionType(actualType)) {
+    const expectedFunctionType = parseFunctionType(expectedType);
+    const actualFunctionType = parseFunctionType(actualType);
+
+    return (
+      expectedFunctionType !== undefined &&
+      actualFunctionType !== undefined &&
+      expectedFunctionType.parameterTypes.length === actualFunctionType.parameterTypes.length &&
+      expectedFunctionType.parameterTypes.every(
+        (parameterType, index) => parameterType === actualFunctionType.parameterTypes[index]
+      ) &&
+      expectedFunctionType.returnType === actualFunctionType.returnType
+    );
   }
 
   if (isTupleType(expectedType) && isTupleType(actualType)) {
@@ -577,6 +657,38 @@ export class SemanticAnalyzer {
 
   public getExports(): SemanticModuleExports {
     return this.exports;
+  }
+
+  private analyzeAnonymousFunctionExpression(expression: AnonymousFunctionExpression): SemanticType {
+    if (containsUnknownType(expression.returnType)) {
+      throw createTypeError("Anonymous function cannot return 'unknown'");
+    }
+
+    this.analyzeDefaultParameters(expression.parameters, 'anonymous function');
+
+    const previousReturnType = this.currentReturnType;
+
+    try {
+      this.currentReturnType = expression.returnType;
+      this.withScope(() => {
+        this.defineParameters(expression.parameters);
+
+        for (const bodyStatement of expression.body) {
+          this.analyzeStatement(bodyStatement);
+        }
+      });
+    } finally {
+      this.currentReturnType = previousReturnType;
+    }
+
+    if (expression.returnType !== 'void' && !this.hasReturnStatement(expression.body)) {
+      throw createTypeError(`Anonymous function must return a value of type '${expression.returnType}'`);
+    }
+
+    return buildFunctionType(
+      expression.parameters.map((parameter) => parameter.typeAnnotation),
+      expression.returnType
+    );
   }
 
   private analyzeArguments(
@@ -876,7 +988,7 @@ export class SemanticAnalyzer {
 
       const calleeObjectType = this.analyzeExpression(expression.callee.object);
 
-      if (calleeObjectType === 'function') {
+      if (calleeObjectType === 'function' || isFunctionType(calleeObjectType)) {
         if (expression.callee.property.name === 'name') {
           throw createTypeError(
             `Member '${expression.callee.property.name}' is not callable`,
@@ -996,13 +1108,24 @@ export class SemanticAnalyzer {
     }
 
     if (expression.callee.kind !== 'Identifier') {
-      this.analyzeExpression(expression.callee);
+      const calleeType = this.analyzeExpression(expression.callee);
+
+      if (isFunctionType(calleeType)) {
+        const functionType = parseFunctionType(calleeType);
+
+        if (functionType === undefined) {
+          throw createTypeError('Invalid function type in call expression');
+        }
+
+        this.analyzeArguments(expression.arguments, functionType.parameterTypes, '<function>');
+        return functionType.returnType;
+      }
 
       for (const arg of expression.arguments) {
         this.analyzeExpression(arg);
       }
 
-      return 'unknown';
+      throw createTypeError('Expression is not callable');
     }
 
     const callee = this.scope.lookup(expression.callee.name, expression.callee.location);
@@ -1366,7 +1489,8 @@ export class SemanticAnalyzer {
 
         this.scope.define(
           {
-            callable: false,
+            ...(this.createCallableSymbolForType(parameter.typeAnnotation) ?? {}),
+            callable: isFunctionType(parameter.typeAnnotation),
             mutable: false,
             name: parameter.identifier.name,
             type: parameter.typeAnnotation,
@@ -1443,6 +1567,8 @@ export class SemanticAnalyzer {
 
   private analyzeExpression(expression: Expression): SemanticType {
     switch (expression.kind) {
+      case 'AnonymousFunctionExpression':
+        return this.analyzeAnonymousFunctionExpression(expression);
       case 'ArrayLiteral':
         return this.analyzeArrayLiteral(expression);
       case 'BinaryExpression':
@@ -1768,7 +1894,17 @@ export class SemanticAnalyzer {
   }
 
   private analyzeIdentifier(expression: Identifier): SemanticType {
-    return this.scope.lookup(expression.name, expression.location).type;
+    const symbol = this.scope.lookup(expression.name, expression.location);
+
+    if (
+      symbol.parameterTypes !== undefined &&
+      symbol.returnType !== undefined &&
+      symbol.overloadSignatures === undefined
+    ) {
+      return buildFunctionType(symbol.parameterTypes, symbol.returnType === 'unknown' ? 'void' : symbol.returnType);
+    }
+
+    return symbol.type;
   }
 
   private analyzeIfStatement(statement: IfStatement): void {
@@ -1933,7 +2069,7 @@ export class SemanticAnalyzer {
       return objectType;
     }
 
-    if (objectType === 'function') {
+    if (objectType === 'function' || isFunctionType(objectType)) {
       if (expression.property.name === 'name') {
         return 'string';
       }
@@ -2296,7 +2432,8 @@ export class SemanticAnalyzer {
 
       this.scope.define(
         {
-          callable: false,
+          ...(this.createCallableSymbolForType(type) ?? {}),
+          callable: isFunctionType(type),
           mutable: statement.declarationType === 'var',
           name: statement.identifier.name,
           type,
@@ -2323,7 +2460,8 @@ export class SemanticAnalyzer {
 
     this.scope.define(
       {
-        callable: false,
+        ...(this.createCallableSymbolForType(statement.typeAnnotation) ?? {}),
+        callable: isFunctionType(statement.typeAnnotation),
         mutable: statement.declarationType === 'var',
         name: statement.identifier.name,
         type: statement.typeAnnotation,
@@ -2468,11 +2606,28 @@ export class SemanticAnalyzer {
     }
   }
 
+  private createCallableSymbolForType(
+    type: SemanticType
+  ): Pick<SemanticSymbol, 'minArity' | 'parameterTypes' | 'returnType'> | undefined {
+    const functionType = typeof type === 'string' ? parseFunctionType(type) : undefined;
+
+    if (functionType === undefined) {
+      return undefined;
+    }
+
+    return {
+      minArity: functionType.parameterTypes.length,
+      parameterTypes: functionType.parameterTypes,
+      returnType: functionType.returnType,
+    };
+  }
+
   private defineParameters(parameters: Parameter[]): void {
     for (const parameter of parameters) {
       this.scope.define(
         {
-          callable: false,
+          ...(this.createCallableSymbolForType(parameter.typeAnnotation) ?? {}),
+          callable: isFunctionType(parameter.typeAnnotation),
           mutable: false,
           name: parameter.identifier.name,
           type: parameter.typeAnnotation,

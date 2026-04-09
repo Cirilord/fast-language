@@ -1,4 +1,5 @@
 import type {
+  AnonymousFunctionExpression,
   ArrayLiteral,
   AssignmentOperator,
   AssignmentStatement,
@@ -756,6 +757,20 @@ export class Parser {
     return declaration;
   }
 
+  private parseFunctionExpression(): AnonymousFunctionExpression {
+    this.consume(TokenType.LeftParen, "Expected '(' after 'function'.");
+    const parameters = this.parseParameters();
+    this.consume(TokenType.Colon, "Expected ':' after function parameters.");
+    const returnType = this.parseFunctionReturnType();
+
+    return {
+      body: this.parseBlockStatement(),
+      kind: 'AnonymousFunctionExpression',
+      parameters,
+      returnType,
+    };
+  }
+
   private parseFunctionReturnType(): FunctionReturnType {
     if (this.check(TokenType.Identifier) && this.peek().lexeme === 'void') {
       this.advance();
@@ -954,6 +969,10 @@ export class Parser {
   }
 
   private parsePrimary(): Expression {
+    if (this.match(TokenType.Function)) {
+      return this.parseFunctionExpression();
+    }
+
     if (this.match(TokenType.LeftParen)) {
       const first = this.parseExpression();
 
@@ -1253,13 +1272,21 @@ export class Parser {
 
   private parseTypeName(): TypeName {
     if (this.match(TokenType.LeftParen)) {
-      const types: TypeName[] = [this.parseTypeName()];
+      const types: TypeName[] = [];
 
-      while (this.match(TokenType.Comma)) {
+      if (!this.check(TokenType.RightParen)) {
         types.push(this.parseTypeName());
+
+        while (this.match(TokenType.Comma)) {
+          types.push(this.parseTypeName());
+        }
       }
 
-      this.consume(TokenType.RightParen, "Expected ')' after tuple type.");
+      this.consume(TokenType.RightParen, "Expected ')' after type list.");
+
+      if (this.match(TokenType.Colon)) {
+        return `fn(${types.join(',')}):${this.parseFunctionReturnType()}`;
+      }
 
       if (types.length < 2) {
         throw this.error(this.previous(), 'Tuple types must contain at least two elements.');

@@ -15,6 +15,8 @@ Right now the project is implemented in TypeScript and already supports:
 - compound assignment operators with `+=`, `-=`, `*=`, `/=`, and `%=`
 - logical assignment operators with `&&=`, `||=`, and `??=`
 - function declarations with typed parameters and optional default values
+- function types like `(): void` and `(string): void`
+- anonymous function expressions like `function(text: string): void { ... }`
 - rest parameters with typed arrays like `...items: string[]`
 - overloaded functions and methods with signature declarations and a single `unknown` implementation
 - generic functions and classes with type parameters like `<T, K = string>`
@@ -131,6 +133,21 @@ function logStringValue(value: string): void {
   return;
 }
 
+function run(callback: (): void): void {
+  callback();
+  return;
+}
+
+function runWithText(callback: (string): void, text: string): void {
+  callback(text);
+  return;
+}
+
+function sayHi(): void {
+  print("hi");
+  return;
+}
+
 function logValue(value: string): void;
 function logValue(value: int): void;
 function logValue(value: unknown): void {
@@ -220,6 +237,7 @@ class AppError extends Error {
 }
 
 val loadState: LoadState = LoadState.Idle;
+val callbackRef: (string): void = logStringValue;
 val computedStatus: string = getStatus();
 val genericStatus: string = identity<string>(status);
 val importedStatus: string = logGenericText<string>("Imported generic text", status);
@@ -368,6 +386,16 @@ logValue("global overload");
 logValue(42);
 logger.log("class overload");
 logger.log(7);
+run(sayHi);
+run(function(): void {
+  print("inline callback");
+  return;
+});
+runWithText(callbackRef, "callback ref");
+runWithText(function(text: string): void {
+  print(text);
+  return;
+}, "callback inline");
 logImportedText();
 File1.logImportedText();
 

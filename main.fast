@@ -75,6 +75,21 @@ function logStringValue(value: string): void {
   return;
 }
 
+function run(callback: (): void): void {
+  callback();
+  return;
+}
+
+function runWithText(callback: (string): void, text: string): void {
+  callback(text);
+  return;
+}
+
+function sayHi(): void {
+  print("hi");
+  return;
+}
+
 function logValue(value: string): void;
 function logValue(value: int): void;
 function logValue(value: unknown): void {
@@ -178,6 +193,7 @@ class AppError extends Error {
 }
 
 val loadState: LoadState = LoadState.Idle;
+val callbackRef: (string): void = logStringValue;
 val computedStatus: string = getStatus();
 val genericStatus: string = identity<string>(status);
 val importedStatus: string = logGenericText<string>("Imported generic text", status);
@@ -336,6 +352,16 @@ logValue("global overload");
 logValue(42);
 logger.log("class overload");
 logger.log(7);
+run(sayHi);
+run(function(): void {
+  print("inline callback");
+  return;
+});
+runWithText(callbackRef, "callback ref");
+runWithText(function(text: string): void {
+  print(text);
+  return;
+}, "callback inline");
 logStatus("state");
 logImportedText();
 File1.logImportedText();

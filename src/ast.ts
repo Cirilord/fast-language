@@ -235,6 +235,7 @@ export type AssignmentOperator = '&&=' | '%=' | '*=' | '+=' | '-=' | '/=' | '=' 
 export type UnaryOperator = '!' | '-';
 
 export type Expression =
+  | AnonymousFunctionExpression
   | ArrayLiteral
   | BinaryExpression
   | CallExpression
@@ -250,6 +251,13 @@ export type Expression =
   | ThisExpression
   | TupleLiteral
   | UnaryExpression;
+
+export type AnonymousFunctionExpression = {
+  body: Statement[];
+  kind: 'AnonymousFunctionExpression';
+  parameters: Parameter[];
+  returnType: FunctionReturnType;
+};
 
 export type ArrayLiteral = {
   elements: Expression[];

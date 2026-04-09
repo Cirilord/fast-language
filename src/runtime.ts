@@ -1,4 +1,5 @@
 import type {
+  AnonymousFunctionExpression,
   ArrayLiteral,
   AssignmentOperator,
   AssignmentStatement,
@@ -833,6 +834,18 @@ export class Interpreter {
     return enumValue;
   }
 
+  private evaluateAnonymousFunctionExpression(expression: AnonymousFunctionExpression): RuntimeValue {
+    return {
+      body: expression.body,
+      closure: this.scope,
+      name: '',
+      parameters: expression.parameters,
+      returnType: expression.returnType,
+      type: 'function',
+      typeParameters: [],
+    };
+  }
+
   private evaluateArrayLiteral(expression: ArrayLiteral): RuntimeValue {
     return {
       elements: expression.elements.map((element) => this.evaluateExpression(element)),
@@ -1026,6 +1039,8 @@ export class Interpreter {
 
   private evaluateExpression(expression: Expression): RuntimeValue {
     switch (expression.kind) {
+      case 'AnonymousFunctionExpression':
+        return this.evaluateAnonymousFunctionExpression(expression);
       case 'ArrayLiteral':
         return this.evaluateArrayLiteral(expression);
       case 'BinaryExpression':
@@ -1977,6 +1992,7 @@ export class Interpreter {
   }
 
   private renderUserFunctionValue(functionValue: UserFunctionValue): string {
+    const namePrefix = functionValue.name === '' ? '' : ` ${functionValue.name}`;
     const typeParameters =
       functionValue.typeParameters.length === 0
         ? ''
@@ -1995,7 +2011,7 @@ export class Interpreter {
       })
       .join(', ');
 
-    return `function ${functionValue.name}${typeParameters}(${parameters}): ${functionValue.returnType} { ... }`;
+    return `function${namePrefix}${typeParameters}(${parameters}): ${functionValue.returnType} { ... }`;
   }
 
   private resolveBaseClass(statement: ClassDeclaration): ClassValue | undefined {

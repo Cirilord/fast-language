@@ -53,6 +53,8 @@ This file tracks working conventions for the `fast` language project so future c
 - `while` loops use `while (condition) { ... }`, and the condition must be boolean.
 - `do while` loops use `do { ... } while (condition);`, and the condition must be boolean.
 - Functions use `function name(parameter: type): type { return value; }`.
+- Function types use `(...): type`, like `(): void` or `(string): void`.
+- Anonymous function expressions use `function(parameter: type): type { ... }`.
 - Parameters can use default values, like `label: string = "status"`.
 - Rest parameters use typed arrays and come last, like `...items: string[]`.
 - Functions and class methods support overloads through repeated signatures without bodies followed by one implementation body.
