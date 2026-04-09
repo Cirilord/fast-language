@@ -37,6 +37,7 @@ Right now the project is implemented in TypeScript and already supports:
 - combined imports with `import File, { name } from "./file";`
 - builtin namespace modules like `import Math from "math";`
 - builtin namespace modules like `import Array from "array";`
+- builtin namespace modules like `import String from "string";`
 - named exports with `export var`, `export val`, `export function`, and `export name;`
 - symbolic enums like `enum Status { Pending, Done }`
 - typed numeric declarations like `var count: int = 10;`
@@ -69,6 +70,7 @@ Right now the project is implemented in TypeScript and already supports:
 ```fast
 import Array from "array";
 import Math from "math";
+import String from "string";
 import File1, { importedText, logImportedText } from "./file1";
 
 // Number types are declared on variables.
@@ -97,6 +99,7 @@ val fallbackText: string = nullableText ?? "Default text";
 val status: string = canFallback ? "enabled" : "disabled";
 val statusMessage: string = "Status: " + status;
 val itemMessage: string = "First item: " + items[0];
+val sampleText: string = "  Fast Language  ";
 val mathPi: double = Math.PI;
 val mathAbs: int = Math.abs(-10);
 val mathMax: double = Math.max(10, 20.0, 15);
@@ -108,6 +111,23 @@ val arrayIndex: int = Array.indexOf(itemsCopy, "third");
 val arraySlice: string[] = Array.slice(itemsCopy, 0, 2);
 val arrayAt: string = Array.at(itemsCopy, -1);
 val joinedItems: string = Array.join(itemsCopy, " | ");
+val stringLength: int = String.length(sampleText);
+val stringSlice: string = String.slice(sampleText, 2, 6);
+val stringIncludes: boolean = String.includes(sampleText, "Fast");
+val stringIndex: int = String.indexOf(sampleText, "Language");
+val stringStarts: boolean = String.startsWith(sampleText, "  Fast");
+val stringEnds: boolean = String.endsWith(sampleText, "  ");
+val stringRepeat: string = String.repeat("ha", 3);
+val stringTrim: string = String.trim(sampleText);
+val stringTrimStart: string = String.trimStart(sampleText);
+val stringTrimEnd: string = String.trimEnd(sampleText);
+val stringLower: string = String.toLowerCase(sampleText);
+val stringUpper: string = String.toUpperCase(sampleText);
+val stringAt: string = String.at(sampleText, -3);
+val stringSplit: string[] = String.split("a,b,c", ",");
+val stringReplace: string = String.replace(sampleText, "Fast", "Slow");
+val stringPadStart: string = String.padStart("7", 3, "0");
+val stringPadEnd: string = String.padEnd("7", 3, "0");
 
 enum LoadState {
   Idle,

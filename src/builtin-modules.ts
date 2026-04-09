@@ -121,6 +121,22 @@ function expectArrayArgument(value: RuntimeValue | undefined, functionName: stri
   return value.elements;
 }
 
+function expectIntegerArgument(value: RuntimeValue | undefined, functionName: string, index: number): number {
+  if (value?.type !== 'number' || value.numberType !== 'int') {
+    throw createTypeError(`'${functionName}' expects int at argument ${index}`);
+  }
+
+  return value.value;
+}
+
+function expectStringArgument(value: RuntimeValue | undefined, functionName: string, index: number): string {
+  if (value?.type !== 'string') {
+    throw createTypeError(`'${functionName}' expects string at argument ${index}`);
+  }
+
+  return value.value;
+}
+
 function getArrayElementAt(elements: RuntimeValue[], index: number, functionName: string): RuntimeValue {
   const value = elements[index];
 
@@ -255,6 +271,17 @@ function preciseSum(values: number[]): number {
   }
 
   return sum;
+}
+
+function getStringCharacterAt(value: string, index: number, functionName: string): string {
+  const normalizedIndex = index >= 0 ? index : value.length + index;
+  const character = value.at(normalizedIndex);
+
+  if (character === undefined) {
+    throw createReferenceError(`'${functionName}' index '${index}' is out of bounds`);
+  }
+
+  return character;
 }
 
 function createMathRuntimeExports(): RuntimeModuleExports {
@@ -774,6 +801,214 @@ function createArraySemanticExports(): SemanticModuleExports {
   return exports;
 }
 
+function createStringRuntimeExports(): RuntimeModuleExports {
+  const exports = new Map<string, RuntimeValue>();
+
+  exports.set('length', {
+    call: ([value]): RuntimeValue => createNumberValue(expectStringArgument(value, 'String.length', 1).length, 'int'),
+    name: 'String.length',
+    type: 'native-function',
+  });
+
+  exports.set('slice', {
+    call: ([value, start, end]): RuntimeValue => ({
+      type: 'string',
+      value: expectStringArgument(value, 'String.slice', 1).slice(
+        expectIntegerArgument(start, 'String.slice', 2),
+        end === undefined ? undefined : expectIntegerArgument(end, 'String.slice', 3)
+      ),
+    }),
+    name: 'String.slice',
+    type: 'native-function',
+  });
+
+  exports.set('includes', {
+    call: ([value, search]): RuntimeValue => ({
+      type: 'boolean',
+      value: expectStringArgument(value, 'String.includes', 1).includes(
+        expectStringArgument(search, 'String.includes', 2)
+      ),
+    }),
+    name: 'String.includes',
+    type: 'native-function',
+  });
+
+  exports.set('indexOf', {
+    call: ([value, search]): RuntimeValue =>
+      createNumberValue(
+        expectStringArgument(value, 'String.indexOf', 1).indexOf(expectStringArgument(search, 'String.indexOf', 2)),
+        'int'
+      ),
+    name: 'String.indexOf',
+    type: 'native-function',
+  });
+
+  exports.set('startsWith', {
+    call: ([value, prefix]): RuntimeValue => ({
+      type: 'boolean',
+      value: expectStringArgument(value, 'String.startsWith', 1).startsWith(
+        expectStringArgument(prefix, 'String.startsWith', 2)
+      ),
+    }),
+    name: 'String.startsWith',
+    type: 'native-function',
+  });
+
+  exports.set('endsWith', {
+    call: ([value, suffix]): RuntimeValue => ({
+      type: 'boolean',
+      value: expectStringArgument(value, 'String.endsWith', 1).endsWith(
+        expectStringArgument(suffix, 'String.endsWith', 2)
+      ),
+    }),
+    name: 'String.endsWith',
+    type: 'native-function',
+  });
+
+  exports.set('repeat', {
+    call: ([value, count]): RuntimeValue => ({
+      type: 'string',
+      value: expectStringArgument(value, 'String.repeat', 1).repeat(expectIntegerArgument(count, 'String.repeat', 2)),
+    }),
+    name: 'String.repeat',
+    type: 'native-function',
+  });
+
+  exports.set('trim', {
+    call: ([value]): RuntimeValue => ({
+      type: 'string',
+      value: expectStringArgument(value, 'String.trim', 1).trim(),
+    }),
+    name: 'String.trim',
+    type: 'native-function',
+  });
+
+  exports.set('trimStart', {
+    call: ([value]): RuntimeValue => ({
+      type: 'string',
+      value: expectStringArgument(value, 'String.trimStart', 1).trimStart(),
+    }),
+    name: 'String.trimStart',
+    type: 'native-function',
+  });
+
+  exports.set('trimEnd', {
+    call: ([value]): RuntimeValue => ({
+      type: 'string',
+      value: expectStringArgument(value, 'String.trimEnd', 1).trimEnd(),
+    }),
+    name: 'String.trimEnd',
+    type: 'native-function',
+  });
+
+  exports.set('toLowerCase', {
+    call: ([value]): RuntimeValue => ({
+      type: 'string',
+      value: expectStringArgument(value, 'String.toLowerCase', 1).toLowerCase(),
+    }),
+    name: 'String.toLowerCase',
+    type: 'native-function',
+  });
+
+  exports.set('toUpperCase', {
+    call: ([value]): RuntimeValue => ({
+      type: 'string',
+      value: expectStringArgument(value, 'String.toUpperCase', 1).toUpperCase(),
+    }),
+    name: 'String.toUpperCase',
+    type: 'native-function',
+  });
+
+  exports.set('at', {
+    call: ([value, index]): RuntimeValue => ({
+      type: 'string',
+      value: getStringCharacterAt(
+        expectStringArgument(value, 'String.at', 1),
+        expectIntegerArgument(index, 'String.at', 2),
+        'String.at'
+      ),
+    }),
+    name: 'String.at',
+    type: 'native-function',
+  });
+
+  exports.set('split', {
+    call: ([value, separator]): RuntimeValue => ({
+      elements: expectStringArgument(value, 'String.split', 1)
+        .split(expectStringArgument(separator, 'String.split', 2))
+        .map((element) => ({ type: 'string', value: element })),
+      type: 'array',
+    }),
+    name: 'String.split',
+    type: 'native-function',
+  });
+
+  exports.set('replace', {
+    call: ([value, search, replacement]): RuntimeValue => ({
+      type: 'string',
+      value: expectStringArgument(value, 'String.replace', 1).replace(
+        expectStringArgument(search, 'String.replace', 2),
+        expectStringArgument(replacement, 'String.replace', 3)
+      ),
+    }),
+    name: 'String.replace',
+    type: 'native-function',
+  });
+
+  exports.set('padStart', {
+    call: ([value, maxLength, fillString]): RuntimeValue => ({
+      type: 'string',
+      value: expectStringArgument(value, 'String.padStart', 1).padStart(
+        expectIntegerArgument(maxLength, 'String.padStart', 2),
+        fillString === undefined ? ' ' : expectStringArgument(fillString, 'String.padStart', 3)
+      ),
+    }),
+    name: 'String.padStart',
+    type: 'native-function',
+  });
+
+  exports.set('padEnd', {
+    call: ([value, maxLength, fillString]): RuntimeValue => ({
+      type: 'string',
+      value: expectStringArgument(value, 'String.padEnd', 1).padEnd(
+        expectIntegerArgument(maxLength, 'String.padEnd', 2),
+        fillString === undefined ? ' ' : expectStringArgument(fillString, 'String.padEnd', 3)
+      ),
+    }),
+    name: 'String.padEnd',
+    type: 'native-function',
+  });
+
+  return exports;
+}
+
+function createStringSemanticExports(): SemanticModuleExports {
+  const exports = new Map<string, SemanticSymbol>();
+
+  exports.set('length', { ...createSemanticFunction('int', ['string'], 1), name: 'length' });
+  exports.set('slice', { ...createSemanticFunction('string', ['string', 'int', 'int'], 2), name: 'slice' });
+  exports.set('includes', { ...createSemanticFunction('boolean', ['string', 'string'], 2), name: 'includes' });
+  exports.set('indexOf', { ...createSemanticFunction('int', ['string', 'string'], 2), name: 'indexOf' });
+  exports.set('startsWith', { ...createSemanticFunction('boolean', ['string', 'string'], 2), name: 'startsWith' });
+  exports.set('endsWith', { ...createSemanticFunction('boolean', ['string', 'string'], 2), name: 'endsWith' });
+  exports.set('repeat', { ...createSemanticFunction('string', ['string', 'int'], 2), name: 'repeat' });
+  exports.set('trim', { ...createSemanticFunction('string', ['string'], 1), name: 'trim' });
+  exports.set('trimStart', { ...createSemanticFunction('string', ['string'], 1), name: 'trimStart' });
+  exports.set('trimEnd', { ...createSemanticFunction('string', ['string'], 1), name: 'trimEnd' });
+  exports.set('toLowerCase', { ...createSemanticFunction('string', ['string'], 1), name: 'toLowerCase' });
+  exports.set('toUpperCase', { ...createSemanticFunction('string', ['string'], 1), name: 'toUpperCase' });
+  exports.set('at', { ...createSemanticFunction('string', ['string', 'int'], 2), name: 'at' });
+  exports.set('split', { ...createSemanticFunction('string[]', ['string', 'string'], 2), name: 'split' });
+  exports.set('replace', {
+    ...createSemanticFunction('string', ['string', 'string', 'string'], 3),
+    name: 'replace',
+  });
+  exports.set('padStart', { ...createSemanticFunction('string', ['string', 'int', 'string'], 2), name: 'padStart' });
+  exports.set('padEnd', { ...createSemanticFunction('string', ['string', 'int', 'string'], 2), name: 'padEnd' });
+
+  return exports;
+}
+
 const BUILTIN_MODULES = new Map<
   string,
   {
@@ -783,6 +1018,7 @@ const BUILTIN_MODULES = new Map<
 >([
   ['array', { runtimeExports: createArrayRuntimeExports(), semanticExports: createArraySemanticExports() }],
   ['math', { runtimeExports: createMathRuntimeExports(), semanticExports: createMathSemanticExports() }],
+  ['string', { runtimeExports: createStringRuntimeExports(), semanticExports: createStringSemanticExports() }],
 ]);
 
 export function getBuiltinModuleRuntimeExports(source: string): RuntimeModuleExports | undefined {
