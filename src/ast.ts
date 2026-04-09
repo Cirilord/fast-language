@@ -5,7 +5,9 @@ export type Program = {
 
 export type Statement =
   | AssignmentStatement
+  | BreakStatement
   | ClassDeclaration
+  | ContinueStatement
   | DoWhileStatement
   | IfStatement
   | ThrowStatement
@@ -31,9 +33,17 @@ export type AssignmentStatement = {
   value: Expression;
 };
 
+export type BreakStatement = {
+  kind: 'BreakStatement';
+};
+
 export type AssignmentTarget = Identifier | MemberExpression;
 
 export type AccessModifier = 'private' | 'protected' | 'public';
+
+export type ContinueStatement = {
+  kind: 'ContinueStatement';
+};
 
 export type ForStatement = {
   body: Statement[];

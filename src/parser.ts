@@ -5,6 +5,7 @@ import type {
   AssignmentTarget,
   BinaryExpression,
   BinaryOperator,
+  BreakStatement,
   CallExpression,
   ClassConstructor,
   ClassDeclaration,
@@ -12,6 +13,7 @@ import type {
   ClassMethod,
   ClassProperty,
   ConditionalExpression,
+  ContinueStatement,
   DoWhileStatement,
   ExceptClause,
   ExportDeclaration,
@@ -20,8 +22,8 @@ import type {
   ForStatement,
   FunctionDeclaration,
   FunctionReturnType,
-  IfStatement,
   Identifier,
+  IfStatement,
   ImportDeclaration,
   MemberExpression,
   NewExpression,
@@ -33,10 +35,10 @@ import type {
   Statement,
   StringLiteral,
   ThrowStatement,
+  TryStatement,
   TupleLiteral,
   TypeName,
   TypeParameter,
-  TryStatement,
   UnaryExpression,
   UnaryOperator,
   VariableDeclaration,
@@ -230,6 +232,14 @@ export class Parser {
     return body;
   }
 
+  private parseBreakStatement(): BreakStatement {
+    this.consume(TokenType.Semicolon, "Expected ';' after break.");
+
+    return {
+      kind: 'BreakStatement',
+    };
+  }
+
   private parseCallExpression(): Expression {
     let expression = this.parsePrimary();
 
@@ -414,6 +424,14 @@ export class Parser {
       kind: 'ConditionalExpression',
       test,
     } satisfies ConditionalExpression;
+  }
+
+  private parseContinueStatement(): ContinueStatement {
+    this.consume(TokenType.Semicolon, "Expected ';' after continue.");
+
+    return {
+      kind: 'ContinueStatement',
+    };
   }
 
   private parseDoWhileStatement(): DoWhileStatement {
@@ -811,6 +829,7 @@ export class Parser {
 
     throw this.error(this.peek(), 'Expected expression.');
   }
+
   private parseReturnStatement(): ReturnStatement {
     if (this.match(TokenType.Semicolon)) {
       return {
@@ -858,6 +877,14 @@ export class Parser {
 
     if (this.match(TokenType.If)) {
       return this.parseIfStatement();
+    }
+
+    if (this.match(TokenType.Break)) {
+      return this.parseBreakStatement();
+    }
+
+    if (this.match(TokenType.Continue)) {
+      return this.parseContinueStatement();
     }
 
     if (this.match(TokenType.Abstract)) {

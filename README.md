@@ -43,6 +43,7 @@ Right now the project is implemented in TypeScript and already supports:
 - array literals with `[value, value]`
 - `for ... of` loops with optional index binding
 - `if`, `else if`, and `else` with boolean conditions
+- `break` and `continue` inside loops
 - `while` loops with boolean conditions
 - `do ... while` loops with boolean conditions
 - generic function-call parsing like `print(a);`
@@ -223,6 +224,11 @@ for (var item, index of items) {
 }
 
 while (counter < 3) {
+  if (counter == 1) {
+    counter += 1;
+    continue;
+  }
+
   print(counter);
   counter += 1;
 }
@@ -231,6 +237,18 @@ do {
   print(doCounter);
   doCounter += 1;
 } while (doCounter < 2);
+
+for (var loopItem, loopIndex of items) {
+  if (loopIndex == 1) {
+    continue;
+  }
+
+  if (loopIndex == 2) {
+    break;
+  }
+
+  print(loopItem);
+}
 
 if (isType(status, "string")) {
   print("status is string");
@@ -450,6 +468,7 @@ Then open a `.fast` file in the extension development window.
 - tuple types use `(T1, T2, ...)` and tuple literals use `(value1, value2, ...)`
 - `for` loops use `for (var element of array) { ... }`
 - `for` loops can access index with `for (var element, index of array) { ... }`
+- `break` and `continue` can only be used inside `for`, `while`, and `do while`
 - `while` loops use `while (condition) { ... }` and the condition must be boolean
 - `do while` loops use `do { ... } while (condition);` and the condition must be boolean
 - functions use `function name(parameter: type): type { return value; }`

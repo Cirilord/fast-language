@@ -43,6 +43,7 @@ This file tracks working conventions for the `fast` language project so future c
 - `for` loops use `for (var element of array) { ... }`.
 - `for` loops can access index with `for (var element, index of array) { ... }`.
 - `if` statements use `if (condition) { ... }`, `else if (condition) { ... }`, and `else { ... }`, and each condition must be boolean.
+- `break` and `continue` are only valid inside `for`, `while`, and `do while`.
 - `while` loops use `while (condition) { ... }`, and the condition must be boolean.
 - `do while` loops use `do { ... } while (condition);`, and the condition must be boolean.
 - Functions use `function name(parameter: type): type { return value; }`.

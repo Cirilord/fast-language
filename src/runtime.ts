@@ -17,8 +17,8 @@ import type {
   ForStatement,
   FunctionDeclaration,
   FunctionReturnType,
-  IfStatement,
   Identifier,
+  IfStatement,
   ImportDeclaration,
   MemberExpression,
   NewExpression,
@@ -30,10 +30,10 @@ import type {
   Statement,
   StringLiteral,
   ThrowStatement,
-  TypeParameter,
-  TypeName,
   TryStatement,
   TupleLiteral,
+  TypeName,
+  TypeParameter,
   UnaryExpression,
   VariableDeclaration,
   WhileStatement,
@@ -148,6 +148,10 @@ export type RuntimeImportResolver = (source: string) => RuntimeModuleExports;
 class ReturnSignal {
   public constructor(public readonly value: RuntimeValue) {}
 }
+
+class BreakSignal {}
+
+class ContinueSignal {}
 
 class ThrowSignal {
   public constructor(public readonly value: RuntimeValue) {}
@@ -1214,25 +1218,43 @@ export class Interpreter {
     return this.scope.assign(statement.target.name, value);
   }
 
+  private executeBreakStatement(): RuntimeValue {
+    throw new BreakSignal();
+  }
+
   private executeClassDeclaration(statement: ClassDeclaration): RuntimeValue {
     const classValue = this.createClassValue(statement);
     return this.scope.define(statement.identifier.name, classValue, false);
   }
 
+  private executeContinueStatement(): RuntimeValue {
+    throw new ContinueSignal();
+  }
+
   private executeDoWhileStatement(statement: DoWhileStatement): RuntimeValue {
-    let lastValue: RuntimeValue;
+    let lastValue: RuntimeValue = { type: 'null', value: null };
     let shouldContinue: boolean;
 
     do {
-      lastValue = this.withScope(() => {
-        let bodyValue: RuntimeValue = { type: 'null', value: null };
+      try {
+        lastValue = this.withScope(() => {
+          let bodyValue: RuntimeValue = { type: 'null', value: null };
 
-        for (const bodyStatement of statement.body) {
-          bodyValue = this.executeStatement(bodyStatement);
+          for (const bodyStatement of statement.body) {
+            bodyValue = this.executeStatement(bodyStatement);
+          }
+
+          return bodyValue;
+        });
+      } catch (error) {
+        if (error instanceof BreakSignal) {
+          break;
         }
 
-        return bodyValue;
-      });
+        if (!(error instanceof ContinueSignal)) {
+          throw error;
+        }
+      }
 
       const condition = this.evaluateExpression(statement.condition);
 
@@ -1272,21 +1294,31 @@ export class Interpreter {
     }
 
     for (const [index, element] of iterable.elements.entries()) {
-      lastValue = this.withScope(() => {
-        this.scope.define(statement.element.name, element, true);
+      try {
+        lastValue = this.withScope(() => {
+          this.scope.define(statement.element.name, element, true);
 
-        if (statement.index !== undefined) {
-          this.scope.define(statement.index.name, { numberType: 'int', type: 'number', value: index }, false);
+          if (statement.index !== undefined) {
+            this.scope.define(statement.index.name, { numberType: 'int', type: 'number', value: index }, false);
+          }
+
+          let bodyValue: RuntimeValue = { type: 'null', value: null };
+
+          for (const bodyStatement of statement.body) {
+            bodyValue = this.executeStatement(bodyStatement);
+          }
+
+          return bodyValue;
+        });
+      } catch (error) {
+        if (error instanceof BreakSignal) {
+          break;
         }
 
-        let bodyValue: RuntimeValue = { type: 'null', value: null };
-
-        for (const bodyStatement of statement.body) {
-          bodyValue = this.executeStatement(bodyStatement);
+        if (!(error instanceof ContinueSignal)) {
+          throw error;
         }
-
-        return bodyValue;
-      });
+      }
     }
 
     return lastValue;
@@ -1385,8 +1417,12 @@ export class Interpreter {
     switch (statement.kind) {
       case 'AssignmentStatement':
         return this.executeAssignmentStatement(statement);
+      case 'BreakStatement':
+        return this.executeBreakStatement();
       case 'ClassDeclaration':
         return this.executeClassDeclaration(statement);
+      case 'ContinueStatement':
+        return this.executeContinueStatement();
       case 'DoWhileStatement':
         return this.executeDoWhileStatement(statement);
       case 'ThrowStatement':
@@ -1425,7 +1461,7 @@ export class Interpreter {
   }
 
   private executeTryStatement(statement: TryStatement): RuntimeValue {
-    let completionSignal: ReturnSignal | ThrowSignal | undefined;
+    let completionSignal: BreakSignal | ContinueSignal | ReturnSignal | ThrowSignal | undefined;
     let lastValue: RuntimeValue = { type: 'null', value: null };
 
     try {
@@ -1440,7 +1476,10 @@ export class Interpreter {
       });
     } catch (error) {
       if (!(error instanceof ThrowSignal)) {
-        completionSignal = error instanceof ReturnSignal ? error : undefined;
+        completionSignal =
+          error instanceof BreakSignal || error instanceof ContinueSignal || error instanceof ReturnSignal
+            ? error
+            : undefined;
 
         if (completionSignal === undefined) {
           throw error;
@@ -1464,7 +1503,12 @@ export class Interpreter {
               return bodyValue;
             });
           } catch (exceptError) {
-            if (exceptError instanceof ReturnSignal || exceptError instanceof ThrowSignal) {
+            if (
+              exceptError instanceof BreakSignal ||
+              exceptError instanceof ContinueSignal ||
+              exceptError instanceof ReturnSignal ||
+              exceptError instanceof ThrowSignal
+            ) {
               completionSignal = exceptError;
             } else {
               throw exceptError;
@@ -1488,7 +1532,12 @@ export class Interpreter {
           return bodyValue;
         });
       } catch (finallyError) {
-        if (finallyError instanceof ReturnSignal || finallyError instanceof ThrowSignal) {
+        if (
+          finallyError instanceof BreakSignal ||
+          finallyError instanceof ContinueSignal ||
+          finallyError instanceof ReturnSignal ||
+          finallyError instanceof ThrowSignal
+        ) {
           completionSignal = finallyError;
         } else {
           throw finallyError;
@@ -1528,15 +1577,25 @@ export class Interpreter {
         break;
       }
 
-      lastValue = this.withScope(() => {
-        let bodyValue: RuntimeValue = { type: 'null', value: null };
+      try {
+        lastValue = this.withScope(() => {
+          let bodyValue: RuntimeValue = { type: 'null', value: null };
 
-        for (const bodyStatement of statement.body) {
-          bodyValue = this.executeStatement(bodyStatement);
+          for (const bodyStatement of statement.body) {
+            bodyValue = this.executeStatement(bodyStatement);
+          }
+
+          return bodyValue;
+        });
+      } catch (error) {
+        if (error instanceof BreakSignal) {
+          break;
         }
 
-        return bodyValue;
-      });
+        if (!(error instanceof ContinueSignal)) {
+          throw error;
+        }
+      }
     }
 
     return lastValue;

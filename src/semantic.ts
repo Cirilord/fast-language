@@ -18,8 +18,8 @@ import type {
   ForStatement,
   FunctionDeclaration,
   FunctionReturnType,
-  IfStatement,
   Identifier,
+  IfStatement,
   ImportDeclaration,
   MemberExpression,
   NewExpression,
@@ -30,10 +30,10 @@ import type {
   ReturnStatement,
   Statement,
   ThrowStatement,
-  TypeParameter,
-  TypeName,
   TryStatement,
   TupleLiteral,
+  TypeName,
+  TypeParameter,
   UnaryExpression,
   VariableDeclaration,
   WhileStatement,
@@ -484,6 +484,7 @@ export class SemanticAnalyzer {
   private currentClass: ClassDeclaration | undefined;
   private currentReturnType: FunctionReturnType | undefined;
   private readonly exports = new Map<string, SemanticSymbol>();
+  private loopDepth = 0;
   private scope = new SemanticScope();
 
   public constructor(private readonly resolveImport?: SemanticImportResolver) {
@@ -733,6 +734,12 @@ export class SemanticAnalyzer {
     }
 
     return promoteNumericType(leftType, rightType);
+  }
+
+  private analyzeBreakStatement(): void {
+    if (this.loopDepth === 0) {
+      throw createSyntaxError("'break' can only be used inside loops");
+    }
   }
 
   private analyzeCallExpression(expression: CallExpression): SemanticType {
@@ -1165,6 +1172,12 @@ export class SemanticAnalyzer {
     throw createTypeError('Ternary branches must have compatible types');
   }
 
+  private analyzeContinueStatement(): void {
+    if (this.loopDepth === 0) {
+      throw createSyntaxError("'continue' can only be used inside loops");
+    }
+  }
+
   private analyzeDefaultParameters(parameters: Parameter[], ownerName: string): void {
     this.withScope(() => {
       for (const parameter of parameters) {
@@ -1207,10 +1220,12 @@ export class SemanticAnalyzer {
   }
 
   private analyzeDoWhileStatement(statement: DoWhileStatement): void {
-    this.withScope(() => {
-      for (const bodyStatement of statement.body) {
-        this.analyzeStatement(bodyStatement);
-      }
+    this.withLoop(() => {
+      this.withScope(() => {
+        for (const bodyStatement of statement.body) {
+          this.analyzeStatement(bodyStatement);
+        }
+      });
     });
 
     const conditionType = this.analyzeExpression(statement.condition);
@@ -1282,32 +1297,34 @@ export class SemanticAnalyzer {
     const elementType =
       iterableType === 'array' || iterableType === 'unknown' ? 'unknown' : getArrayElementType(iterableType);
 
-    this.withScope(() => {
-      this.scope.define(
-        {
-          callable: false,
-          mutable: true,
-          name: statement.element.name,
-          type: elementType,
-        },
-        statement.element.location
-      );
-
-      if (statement.index !== undefined) {
+    this.withLoop(() => {
+      this.withScope(() => {
         this.scope.define(
           {
             callable: false,
-            mutable: false,
-            name: statement.index.name,
-            type: 'int',
+            mutable: true,
+            name: statement.element.name,
+            type: elementType,
           },
-          statement.index.location
+          statement.element.location
         );
-      }
 
-      for (const bodyStatement of statement.body) {
-        this.analyzeStatement(bodyStatement);
-      }
+        if (statement.index !== undefined) {
+          this.scope.define(
+            {
+              callable: false,
+              mutable: false,
+              name: statement.index.name,
+              type: 'int',
+            },
+            statement.index.location
+          );
+        }
+
+        for (const bodyStatement of statement.body) {
+          this.analyzeStatement(bodyStatement);
+        }
+      });
     });
   }
 
@@ -1777,8 +1794,14 @@ export class SemanticAnalyzer {
       case 'AssignmentStatement':
         this.analyzeAssignmentStatement(statement);
         return;
+      case 'BreakStatement':
+        this.analyzeBreakStatement();
+        return;
       case 'ClassDeclaration':
         this.analyzeClassDeclaration(statement);
+        return;
+      case 'ContinueStatement':
+        this.analyzeContinueStatement();
         return;
       case 'DoWhileStatement':
         this.analyzeDoWhileStatement(statement);
@@ -1977,10 +2000,12 @@ export class SemanticAnalyzer {
       throw createTypeError(`While condition must be a boolean, got '${conditionType}'`);
     }
 
-    this.withScope(() => {
-      for (const bodyStatement of statement.body) {
-        this.analyzeStatement(bodyStatement);
-      }
+    this.withLoop(() => {
+      this.withScope(() => {
+        for (const bodyStatement of statement.body) {
+          this.analyzeStatement(bodyStatement);
+        }
+      });
     });
   }
 
@@ -3042,6 +3067,16 @@ export class SemanticAnalyzer {
           );
         }
       }
+    }
+  }
+
+  private withLoop(callback: () => void): void {
+    this.loopDepth += 1;
+
+    try {
+      callback();
+    } finally {
+      this.loopDepth -= 1;
     }
   }
 

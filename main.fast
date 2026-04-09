@@ -189,6 +189,11 @@ for (var item, index of items) {
 }
 
 while (counter < 3) {
+  if (counter == 1) {
+    counter += 1;
+    continue;
+  }
+
   print(counter);
   counter += 1;
 }
@@ -197,6 +202,18 @@ do {
   print(doCounter);
   doCounter += 1;
 } while (doCounter < 2);
+
+for (var loopItem, loopIndex of items) {
+  if (loopIndex == 1) {
+    continue;
+  }
+
+  if (loopIndex == 2) {
+    break;
+  }
+
+  print(loopItem);
+}
 
 if (isType(status, "string")) {
   print("status is string");

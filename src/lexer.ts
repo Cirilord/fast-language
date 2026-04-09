@@ -4,7 +4,9 @@ import { Char } from './utils/char';
 
 const KEYWORDS: Record<string, TokenType> = Object.assign(Object.create(null), {
   abstract: TokenType.Abstract,
+  break: TokenType.Break,
   class: TokenType.Class,
+  continue: TokenType.Continue,
   constructor: TokenType.Constructor,
   do: TokenType.Do,
   else: TokenType.Else,
