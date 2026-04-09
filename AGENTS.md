@@ -27,7 +27,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Logical assignment operators `&&=` and `||=` expect boolean operands.
 - Nullish assignment `??=` assigns only when the current value is `null`.
 - Parentheses can group arithmetic expressions.
-- Unary `-` can be used with numbers and grouped numeric expressions.
+- Unary `-` can be used with numbers and grouped numeric expressions, and unary `!` can be used with boolean expressions.
 - Number literals no longer use suffixes; numeric variable types are `int`, `float`, and `double`.
 - Integer literals do not use decimal points, like `10`; decimal literals use decimal points, like `20.0`.
 - Variable declarations can include a type annotation, like `var name: string = "Fast";`.
@@ -60,6 +60,8 @@ This file tracks working conventions for the `fast` language project so future c
 - `typeOf` returns runtime categories like `string`, `int`, `function`, `class`, `object`, `array`, and `tuple`.
 - `isType` compares the runtime category returned by `typeOf`, and `isInstance` checks class membership through inheritance.
 - `if` branches narrow identifier types when the condition uses `isType(value, "...")` or `isInstance(value, ClassName)`.
+- Narrowing also propagates through `&&`, and `||` preserves only guards shared by both sides, including nested conditions under `!`.
+- Narrowing also propagates through `&&`, and `||` preserves only guards shared by both sides.
 - `throw value;` requires a value whose class extends `Error`.
 - `try { ... } except(error: ErrorType) { ... } finally { ... }` is supported.
 - `try` requires at least one `except`, `finally` is optional, duplicate `except` types are rejected, and broader earlier `except` clauses make narrower later ones unreachable.

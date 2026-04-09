@@ -2,6 +2,7 @@ export enum TokenType {
   Abstract = 'ABSTRACT',
   AmpersandAmpersand = 'AMPERSAND_AMPERSAND',
   AmpersandAmpersandEquals = 'AMPERSAND_AMPERSAND_EQUALS',
+  Bang = 'BANG',
   BangEqual = 'BANG_EQUAL',
   Class = 'CLASS',
   Colon = 'COLON',

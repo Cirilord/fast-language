@@ -260,7 +260,7 @@
         },
         {
           "name": "keyword.operator.logical.ts",
-          "match": "(?:&&|\\|\\||\\?\\?)"
+          "match": "(?:!|&&|\\|\\||\\?\\?)"
         },
         {
           "name": "keyword.operator.ternary.ts",

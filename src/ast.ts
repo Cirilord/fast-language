@@ -184,7 +184,7 @@ export type BinaryOperator = '!=' | '&&' | '%' | '*' | '+' | '-' | '/' | '<' | '
 
 export type AssignmentOperator = '&&=' | '%=' | '*=' | '+=' | '-=' | '/=' | '=' | '??=' | '||=';
 
-export type UnaryOperator = '-';
+export type UnaryOperator = '!' | '-';
 
 export type Expression =
   | ArrayLiteral

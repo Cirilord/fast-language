@@ -1182,6 +1182,17 @@ export class Interpreter {
   private evaluateUnaryExpression(expression: UnaryExpression): RuntimeValue {
     const argument = this.evaluateExpression(expression.argument);
 
+    if (expression.operator === '!') {
+      if (argument.type !== 'boolean') {
+        throw createTypeError(`Operator '${expression.operator}' expects a boolean operand`);
+      }
+
+      return {
+        type: 'boolean',
+        value: !argument.value,
+      };
+    }
+
     if (argument.type !== 'number') {
       throw createTypeError(`Operator '${expression.operator}' expects a number operand`);
     }

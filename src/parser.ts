@@ -1024,7 +1024,7 @@ export class Parser {
   }
 
   private parseUnaryExpression(): Expression {
-    if (this.match(TokenType.Minus)) {
+    if (this.match(TokenType.Bang, TokenType.Minus)) {
       const operator = this.previous().lexeme as UnaryOperator;
 
       return {

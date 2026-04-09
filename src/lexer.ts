@@ -68,10 +68,8 @@ export class Lexer {
           continue;
         }
 
-        throw createSyntaxError("Unexpected character '!'. Did you mean '!='?", {
-          column: startColumn,
-          line: this.line,
-        });
+        tokens.push(this.makeToken(TokenType.Bang, '!', startColumn));
+        continue;
       }
 
       if (Char.isAmpersand(char)) {

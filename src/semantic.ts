@@ -80,6 +80,37 @@ type TypeGuard = {
   narrowedType: SemanticType;
 };
 
+type BranchTypeGuards = {
+  falsy: TypeGuard[];
+  truthy: TypeGuard[];
+};
+
+function getTypeGuardKey(guard: TypeGuard): string {
+  return `${guard.identifier.name}:${guard.narrowedType}`;
+}
+
+function mergeTypeGuards(left: TypeGuard[], right: TypeGuard[]): TypeGuard[] {
+  const merged = new Map<string, TypeGuard>();
+
+  for (const guard of [...left, ...right]) {
+    merged.set(getTypeGuardKey(guard), guard);
+  }
+
+  return [...merged.values()];
+}
+
+function intersectTypeGuards(left: TypeGuard[], right: TypeGuard[]): TypeGuard[] {
+  const rightKeys = new Set(right.map((guard) => getTypeGuardKey(guard)));
+  return left.filter((guard) => rightKeys.has(getTypeGuardKey(guard)));
+}
+
+function emptyBranchTypeGuards(): BranchTypeGuards {
+  return {
+    falsy: [],
+    truthy: [],
+  };
+}
+
 function isNumericType(type: SemanticType): type is NumberLiteralType {
   return type === 'double' || type === 'float' || type === 'int';
 }
@@ -1533,7 +1564,7 @@ export class SemanticAnalyzer {
     }
 
     this.withScope(() => {
-      this.applyTypeGuards(guards);
+      this.applyTypeGuards(guards.truthy);
 
       for (const bodyStatement of statement.consequent) {
         this.analyzeStatement(bodyStatement);
@@ -1548,6 +1579,8 @@ export class SemanticAnalyzer {
 
     if (Array.isArray(alternate)) {
       this.withScope(() => {
+        this.applyTypeGuards(guards.falsy);
+
         for (const bodyStatement of alternate) {
           this.analyzeStatement(bodyStatement);
         }
@@ -1556,7 +1589,10 @@ export class SemanticAnalyzer {
       return;
     }
 
-    this.analyzeIfStatement(alternate);
+    this.withScope(() => {
+      this.applyTypeGuards(guards.falsy);
+      this.analyzeIfStatement(alternate);
+    });
   }
 
   private analyzeImportDeclaration(statement: ImportDeclaration): void {
@@ -1858,6 +1894,14 @@ export class SemanticAnalyzer {
 
   private analyzeUnaryExpression(expression: UnaryExpression): SemanticType {
     const argumentType = this.analyzeExpression(expression.argument);
+
+    if (expression.operator === '!') {
+      if (argumentType !== 'boolean' && argumentType !== 'unknown') {
+        throw createTypeError(`Operator '${expression.operator}' expects a boolean operand`);
+      }
+
+      return 'boolean';
+    }
 
     if (!isNumericType(argumentType)) {
       throw createTypeError(`Operator '${expression.operator}' expects a number operand`);
@@ -2263,9 +2307,43 @@ export class SemanticAnalyzer {
     }
   }
 
-  private extractTypeGuards(expression: Expression): TypeGuard[] {
+  private extractTypeGuards(expression: Expression): BranchTypeGuards {
+    if (expression.kind === 'BinaryExpression') {
+      const leftGuards = this.extractTypeGuards(expression.left);
+      const rightGuards = this.extractTypeGuards(expression.right);
+
+      if (expression.operator === '&&') {
+        return {
+          falsy: intersectTypeGuards(leftGuards.falsy, rightGuards.falsy),
+          truthy: mergeTypeGuards(leftGuards.truthy, rightGuards.truthy),
+        };
+      }
+
+      if (expression.operator === '||') {
+        return {
+          falsy: mergeTypeGuards(leftGuards.falsy, rightGuards.falsy),
+          truthy: intersectTypeGuards(leftGuards.truthy, rightGuards.truthy),
+        };
+      }
+
+      return emptyBranchTypeGuards();
+    }
+
+    if (expression.kind === 'UnaryExpression') {
+      if (expression.operator !== '!') {
+        return emptyBranchTypeGuards();
+      }
+
+      const argumentGuards = this.extractTypeGuards(expression.argument);
+
+      return {
+        falsy: argumentGuards.truthy,
+        truthy: argumentGuards.falsy,
+      };
+    }
+
     if (expression.kind !== 'CallExpression' || expression.callee.kind !== 'Identifier') {
-      return [];
+      return emptyBranchTypeGuards();
     }
 
     if (expression.callee.name === 'isType') {
@@ -2273,21 +2351,24 @@ export class SemanticAnalyzer {
       const typeArgument = expression.arguments[1];
 
       if (valueArgument?.kind !== 'Identifier' || typeArgument?.kind !== 'StringLiteral') {
-        return [];
+        return emptyBranchTypeGuards();
       }
 
       const narrowedType = toSemanticTypeGuard(typeArgument.value);
 
       if (narrowedType === undefined) {
-        return [];
+        return emptyBranchTypeGuards();
       }
 
-      return [
-        {
-          identifier: valueArgument,
-          narrowedType,
-        },
-      ];
+      return {
+        falsy: [],
+        truthy: [
+          {
+            identifier: valueArgument,
+            narrowedType,
+          },
+        ],
+      };
     }
 
     if (expression.callee.name === 'isInstance') {
@@ -2295,24 +2376,27 @@ export class SemanticAnalyzer {
       const classArgument = expression.arguments[1];
 
       if (valueArgument?.kind !== 'Identifier' || classArgument?.kind !== 'Identifier') {
-        return [];
+        return emptyBranchTypeGuards();
       }
 
       const classSymbol = this.scope.lookup(classArgument.name, classArgument.location);
 
       if (classSymbol.classDeclaration === undefined) {
-        return [];
+        return emptyBranchTypeGuards();
       }
 
-      return [
-        {
-          identifier: valueArgument,
-          narrowedType: classArgument.name,
-        },
-      ];
+      return {
+        falsy: [],
+        truthy: [
+          {
+            identifier: valueArgument,
+            narrowedType: classArgument.name,
+          },
+        ],
+      };
     }
 
-    return [];
+    return emptyBranchTypeGuards();
   }
 
   private getClassDeclaration(identifier: Identifier): ClassDeclaration {

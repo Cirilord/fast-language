@@ -68,14 +68,24 @@ function logStringValue(value: string): void {
 function logValue(value: string): void;
 function logValue(value: int): void;
 function logValue(value: unknown): void {
-  if (isType(value, "string")) {
+  if (!(isType(value, "string") && isType(status, "string"))) {
+    print("function fallback");
+    return;
+  }
+
+  if (!isType(value, "string")) {
+    print("function int");
+    logIntValue(value);
+    return;
+  }
+
+  if (isType(value, "string") && isType(status, "string")) {
     print("function string");
     logStringValue(value);
     return;
   }
 
-  print("function int");
-  logIntValue(value);
+  print("function unreachable");
   return;
 }
 
@@ -135,14 +145,18 @@ class Logger {
   public log(value: string): void;
   public log(value: int): void;
   public log(value: unknown): void {
+    if (!isType(value, "string")) {
+      print("method fallback");
+      return;
+    }
+
     if (isType(value, "string")) {
       print("method string");
       logStringValue(value);
       return;
     }
 
-    print("method int");
-    logIntValue(value);
+    print("method unreachable");
     return;
   }
 }
@@ -190,6 +204,13 @@ if (isType(status, "string")) {
   print("status is int");
 } else {
   print("status has another type");
+}
+
+if (!(isType(status, "string") && isType(importedText, "string"))) {
+  print("compound negation fallback");
+} else {
+  logStringValue(status);
+  logStringValue(importedText);
 }
 
 a = 50;

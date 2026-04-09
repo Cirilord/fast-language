@@ -7,7 +7,7 @@ Right now the project is implemented in TypeScript and already supports:
 - variable declarations with `var`
 - constant declarations with `val`
 - reassignment for `var`
-- arithmetic expressions with `+`, `-`, `*`, `/`, `%`, unary `-`, and grouped expressions with `(...)`
+- arithmetic expressions with `+`, `-`, `*`, `/`, `%`, unary `-`, unary `!`, and grouped expressions with `(...)`
 - comparison expressions with `>`, `>=`, `<`, `<=`, `==`, and `!=`
 - logical expressions with `&&`, `||`, and `??`
 - ternary expressions with `condition ? value : value`
@@ -116,7 +116,7 @@ function logStringValue(value: string): void {
 function logValue(value: string): void;
 function logValue(value: int): void;
 function logValue(value: unknown): void {
-  if (isType(value, "string")) {
+  if (isType(value, "string") && isType(status, "string")) {
     print("function string");
     logStringValue(value);
     return;
@@ -345,19 +345,26 @@ Inside `if` branches, the semantic analyzer narrows identifier types for:
 - `isType(value, "...")`
 - `isInstance(value, ClassName)`
 
+That narrowing also works through compound conditions and negation:
+
+- `&&` accumulates guards from both sides
+- `||` keeps only guards that are shared by both sides
+- `!` swaps the positive and negative branch guards of the nested condition
+
 That makes overload implementations with `unknown` practical:
 
 ```fast
 function log(value: string): void;
 function log(value: int): void;
 function log(value: unknown): void {
-  if (isType(value, "string")) {
-    logStringValue(value);
+  if (!(isType(value, "string") && isType(status, "string"))) {
     return;
   }
 
-  logIntValue(value);
-  return;
+  if (isType(value, "string") && isType(status, "string")) {
+    logStringValue(value);
+    return;
+  }
 }
 ```
 
