@@ -17,6 +17,7 @@ import type {
   ForStatement,
   FunctionDeclaration,
   FunctionReturnType,
+  IfStatement,
   Identifier,
   ImportDeclaration,
   MemberExpression,
@@ -1300,6 +1301,46 @@ export class Interpreter {
     );
   }
 
+  private executeIfStatement(statement: IfStatement): RuntimeValue {
+    const condition = this.evaluateExpression(statement.condition);
+
+    if (condition.type !== 'boolean') {
+      throw createTypeError('If condition must be a boolean');
+    }
+
+    if (condition.value) {
+      return this.withScope(() => {
+        let lastValue: RuntimeValue = { type: 'null', value: null };
+
+        for (const bodyStatement of statement.consequent) {
+          lastValue = this.executeStatement(bodyStatement);
+        }
+
+        return lastValue;
+      });
+    }
+
+    const alternate = statement.alternate;
+
+    if (alternate === undefined) {
+      return { type: 'null', value: null };
+    }
+
+    if (Array.isArray(alternate)) {
+      return this.withScope(() => {
+        let lastValue: RuntimeValue = { type: 'null', value: null };
+
+        for (const bodyStatement of alternate) {
+          lastValue = this.executeStatement(bodyStatement);
+        }
+
+        return lastValue;
+      });
+    }
+
+    return this.executeIfStatement(alternate);
+  }
+
   private executeImportDeclaration(statement: ImportDeclaration): RuntimeValue {
     if (this.resolveImport === undefined) {
       throw createTypeError('Imports are not supported in this interpreter mode');
@@ -1347,6 +1388,8 @@ export class Interpreter {
         return this.executeForStatement(statement);
       case 'FunctionDeclaration':
         return this.executeFunctionDeclaration(statement);
+      case 'IfStatement':
+        return this.executeIfStatement(statement);
       case 'ImportDeclaration':
         return this.executeImportDeclaration(statement);
       case 'ReturnStatement':

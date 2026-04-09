@@ -7,6 +7,7 @@ export type Statement =
   | AssignmentStatement
   | ClassDeclaration
   | DoWhileStatement
+  | IfStatement
   | ThrowStatement
   | ExportDeclaration
   | ExpressionStatement
@@ -47,6 +48,15 @@ export type DoWhileStatement = {
   condition: Expression;
   kind: 'DoWhileStatement';
 };
+
+export type IfStatement = {
+  alternate?: ElseBranch;
+  condition: Expression;
+  consequent: Statement[];
+  kind: 'IfStatement';
+};
+
+export type ElseBranch = IfStatement | Statement[];
 
 export type ThrowStatement = {
   kind: 'ThrowStatement';

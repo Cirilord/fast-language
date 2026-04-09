@@ -42,6 +42,7 @@ Right now the project is implemented in TypeScript and already supports:
 - line comments with `//`
 - array literals with `[value, value]`
 - `for ... of` loops with optional index binding
+- `if`, `else if`, and `else` with boolean conditions
 - `while` loops with boolean conditions
 - `do ... while` loops with boolean conditions
 - generic function-call parsing like `print(a);`
@@ -208,6 +209,14 @@ do {
   print(doCounter);
   doCounter += 1;
 } while (doCounter < 2);
+
+if (isType(status, "string")) {
+  print("status is string");
+} else if (isType(status, "int")) {
+  print("status is int");
+} else {
+  print("status has another type");
+}
 
 print(result);
 print(directNegative);

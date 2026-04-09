@@ -18,6 +18,7 @@ import type {
   ForStatement,
   FunctionDeclaration,
   FunctionReturnType,
+  IfStatement,
   Identifier,
   ImportDeclaration,
   MemberExpression,
@@ -1498,6 +1499,38 @@ export class SemanticAnalyzer {
     return this.scope.lookup(expression.name, expression.location).type;
   }
 
+  private analyzeIfStatement(statement: IfStatement): void {
+    const conditionType = this.analyzeExpression(statement.condition);
+
+    if (conditionType !== 'boolean' && conditionType !== 'unknown') {
+      throw createTypeError(`If condition must be a boolean, got '${conditionType}'`);
+    }
+
+    this.withScope(() => {
+      for (const bodyStatement of statement.consequent) {
+        this.analyzeStatement(bodyStatement);
+      }
+    });
+
+    const alternate = statement.alternate;
+
+    if (alternate === undefined) {
+      return;
+    }
+
+    if (Array.isArray(alternate)) {
+      this.withScope(() => {
+        for (const bodyStatement of alternate) {
+          this.analyzeStatement(bodyStatement);
+        }
+      });
+
+      return;
+    }
+
+    this.analyzeIfStatement(alternate);
+  }
+
   private analyzeImportDeclaration(statement: ImportDeclaration): void {
     if (this.resolveImport === undefined) {
       throw createSyntaxError('Imports are not supported in this analyzer mode');
@@ -1700,6 +1733,9 @@ export class SemanticAnalyzer {
         return;
       case 'FunctionDeclaration':
         this.analyzeFunctionDeclaration(statement);
+        return;
+      case 'IfStatement':
+        this.analyzeIfStatement(statement);
         return;
       case 'ImportDeclaration':
         this.analyzeImportDeclaration(statement);
@@ -2431,9 +2467,18 @@ export class SemanticAnalyzer {
 
       if (
         (statement.kind === 'DoWhileStatement' ||
+          statement.kind === 'IfStatement' ||
           statement.kind === 'ForStatement' ||
           statement.kind === 'WhileStatement') &&
-        this.hasReturnStatement(statement.body)
+        this.hasReturnStatement(statement.kind === 'IfStatement' ? statement.consequent : statement.body)
+      ) {
+        return true;
+      }
+
+      if (
+        statement.kind === 'IfStatement' &&
+        statement.alternate !== undefined &&
+        this.hasReturnStatement(Array.isArray(statement.alternate) ? statement.alternate : [statement.alternate])
       ) {
         return true;
       }

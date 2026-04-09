@@ -42,6 +42,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Tuple types use `(T1, T2, ...)`, and tuple literals use `(value1, value2, ...)`.
 - `for` loops use `for (var element of array) { ... }`.
 - `for` loops can access index with `for (var element, index of array) { ... }`.
+- `if` statements use `if (condition) { ... }`, `else if (condition) { ... }`, and `else { ... }`, and each condition must be boolean.
 - `while` loops use `while (condition) { ... }`, and the condition must be boolean.
 - `do while` loops use `do { ... } while (condition);`, and the condition must be boolean.
 - Functions use `function name(parameter: type): type { return value; }`.

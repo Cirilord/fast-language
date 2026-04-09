@@ -20,6 +20,7 @@ import type {
   ForStatement,
   FunctionDeclaration,
   FunctionReturnType,
+  IfStatement,
   Identifier,
   ImportDeclaration,
   MemberExpression,
@@ -588,6 +589,24 @@ export class Parser {
     return this.parseTypeName();
   }
 
+  private parseIfStatement(): IfStatement {
+    this.consume(TokenType.LeftParen, "Expected '(' after 'if'.");
+    const condition = this.parseExpression();
+    this.consume(TokenType.RightParen, "Expected ')' after if condition.");
+
+    const statement: IfStatement = {
+      condition,
+      consequent: this.parseBlockStatement(),
+      kind: 'IfStatement',
+    };
+
+    if (this.match(TokenType.Else)) {
+      statement.alternate = this.match(TokenType.If) ? this.parseIfStatement() : this.parseBlockStatement();
+    }
+
+    return statement;
+  }
+
   private parseImportDeclaration(): ImportDeclaration {
     this.consume(TokenType.LeftBrace, "Expected '{' after 'import'.");
     const identifiers: Identifier[] = [];
@@ -835,6 +854,10 @@ export class Parser {
 
     if (this.match(TokenType.Function)) {
       return this.parseFunctionDeclaration();
+    }
+
+    if (this.match(TokenType.If)) {
+      return this.parseIfStatement();
     }
 
     if (this.match(TokenType.Abstract)) {

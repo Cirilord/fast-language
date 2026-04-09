@@ -162,6 +162,14 @@ do {
   doCounter += 1;
 } while (doCounter < 2);
 
+if (isType(status, "string")) {
+  print("status is string");
+} else if (isType(status, "int")) {
+  print("status is int");
+} else {
+  print("status has another type");
+}
+
 a = 50;
 
 print(a);
