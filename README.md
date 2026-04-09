@@ -35,6 +35,7 @@ Right now the project is implemented in TypeScript and already supports:
 - namespace imports with `import File from "./file";`
 - named imports with `import { name } from "./file";`
 - combined imports with `import File, { name } from "./file";`
+- builtin namespace modules like `import Math from "math";`
 - named exports with `export var`, `export val`, `export function`, and `export name;`
 - symbolic enums like `enum Status { Pending, Done }`
 - typed numeric declarations like `var count: int = 10;`
@@ -65,6 +66,7 @@ Right now the project is implemented in TypeScript and already supports:
 `main.fast`
 
 ```fast
+import Math from "math";
 import File1, { importedText, logImportedText } from "./file1";
 
 // Number types are declared on variables.
@@ -91,6 +93,11 @@ val fallbackText: string = nullableText ?? "Default text";
 val status: string = canFallback ? "enabled" : "disabled";
 val statusMessage: string = "Status: " + status;
 val itemMessage: string = "First item: " + items[0];
+val mathPi: double = Math.PI;
+val mathAbs: int = Math.abs(-10);
+val mathMax: double = Math.max(10, 20.0, 15);
+val mathPow: double = Math.pow(2, 3);
+val mathPrecise: double = Math.sumPrecise([0.1, 0.2, 0.3]);
 
 enum LoadState {
   Idle,

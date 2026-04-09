@@ -49,7 +49,7 @@ import { createReferenceError, createSyntaxError, createTypeError } from './erro
 
 export type SemanticType = 'function' | 'null' | 'void' | TypeName | 'unknown';
 
-type CallableSignature = {
+export type CallableSignature = {
   minArity: number;
   parameterTypes: TypeName[];
   restParameterType?: TypeName;
@@ -966,20 +966,43 @@ export class SemanticAnalyzer {
             );
           }
 
-          const parameterTypes = exportedSymbol.parameterTypes ?? [];
+          if (exportedSymbol.overloadSignatures !== undefined) {
+            return this.resolveOverloadSignature(
+              expression.arguments,
+              expression.callee.property.name,
+              exportedSymbol.overloadSignatures,
+              expression.callee.property.location,
+              expression.typeArguments
+            ).returnType;
+          }
 
-          this.analyzeArguments(
-            expression.arguments,
-            parameterTypes,
-            expression.callee.property.name,
-            exportedSymbol.restParameterType
-          );
+          if (exportedSymbol.parameterTypes !== undefined) {
+            this.analyzeArguments(
+              expression.arguments,
+              exportedSymbol.parameterTypes,
+              expression.callee.property.name,
+              exportedSymbol.restParameterType
+            );
 
-          if (expression.arguments.length < (exportedSymbol.minArity ?? 0)) {
+            if (expression.arguments.length < (exportedSymbol.minArity ?? 0)) {
+              throw createTypeError(
+                `'${expression.callee.property.name}' expects at least ${exportedSymbol.minArity ?? 0} arguments, got ${expression.arguments.length}`,
+                expression.callee.property.location
+              );
+            }
+
+            return exportedSymbol.returnType ?? 'unknown';
+          }
+
+          if (exportedSymbol.arity !== undefined && expression.arguments.length !== exportedSymbol.arity) {
             throw createTypeError(
-              `'${expression.callee.property.name}' expects at least ${exportedSymbol.minArity ?? 0} arguments, got ${expression.arguments.length}`,
+              `'${expression.callee.property.name}' expects ${exportedSymbol.arity} arguments, got ${expression.arguments.length}`,
               expression.callee.property.location
             );
+          }
+
+          for (const argument of expression.arguments) {
+            this.analyzeExpression(argument);
           }
 
           return exportedSymbol.returnType ?? 'unknown';

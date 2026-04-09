@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, extname, isAbsolute, resolve } from 'node:path';
 
 import type { Program } from './ast';
+import { getBuiltinModuleRuntimeExports, getBuiltinModuleSemanticExports, isBuiltinModule } from './builtin-modules';
 import { createReferenceError } from './errors';
 import { Lexer } from './lexer';
 import { Parser } from './parser';
@@ -35,7 +36,7 @@ export class ModuleLoader {
     try {
       const program = this.parseFile(filePath);
       const analyzer = new SemanticAnalyzer(
-        (source): SemanticModuleExports => this.analyzeFile(this.resolveModulePath(source, filePath))
+        (source): SemanticModuleExports => this.resolveSemanticImport(source, filePath)
       );
 
       analyzer.analyze(program);
@@ -65,7 +66,7 @@ export class ModuleLoader {
     try {
       const program = this.parseFile(filePath);
       const interpreter = new Interpreter(
-        (source): RuntimeModuleExports => this.executeFile(this.resolveModulePath(source, filePath))
+        (source): RuntimeModuleExports => this.resolveRuntimeImport(source, filePath)
       );
 
       interpreter.execute(program);
@@ -100,6 +101,10 @@ export class ModuleLoader {
   }
 
   private resolveModulePath(source: string, importerPath: string): string {
+    if (isBuiltinModule(source)) {
+      return source;
+    }
+
     const rawPath = isAbsolute(source) ? source : resolve(dirname(importerPath), source);
 
     if (extname(rawPath) === '') {
@@ -107,5 +112,25 @@ export class ModuleLoader {
     }
 
     return rawPath;
+  }
+
+  private resolveRuntimeImport(source: string, importerPath: string): RuntimeModuleExports {
+    const builtinExports = getBuiltinModuleRuntimeExports(source);
+
+    if (builtinExports !== undefined) {
+      return builtinExports;
+    }
+
+    return this.executeFile(this.resolveModulePath(source, importerPath));
+  }
+
+  private resolveSemanticImport(source: string, importerPath: string): SemanticModuleExports {
+    const builtinExports = getBuiltinModuleSemanticExports(source);
+
+    if (builtinExports !== undefined) {
+      return builtinExports;
+    }
+
+    return this.analyzeFile(this.resolveModulePath(source, importerPath));
   }
 }
