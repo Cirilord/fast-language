@@ -394,6 +394,10 @@ function isLogicalOperator(operator: BinaryOperator): boolean {
   return operator === '&&' || operator === '||';
 }
 
+function isStringConcatenationOperand(type: SemanticType): boolean {
+  return type !== 'void';
+}
+
 function isRelationalOperator(operator: BinaryOperator): boolean {
   return operator === '>' || operator === '>=' || operator === '<' || operator === '<=';
 }
@@ -689,6 +693,16 @@ export class SemanticAnalyzer {
   private analyzeBinaryExpression(expression: BinaryExpression): SemanticType {
     const leftType = this.analyzeExpression(expression.left);
     const rightType = this.analyzeExpression(expression.right);
+
+    if (expression.operator === '+') {
+      if (leftType === 'string' || rightType === 'string') {
+        if (!isStringConcatenationOperand(leftType) || !isStringConcatenationOperand(rightType)) {
+          throw createTypeError(`Operator '${expression.operator}' expects renderable operands`);
+        }
+
+        return 'string';
+      }
+    }
 
     if (isLogicalOperator(expression.operator)) {
       if ((leftType !== 'boolean' && leftType !== 'unknown') || (rightType !== 'boolean' && rightType !== 'unknown')) {

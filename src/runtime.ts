@@ -836,6 +836,13 @@ export class Interpreter {
 
     const right = this.evaluateExpression(expression.right);
 
+    if (expression.operator === '+' && (left.type === 'string' || right.type === 'string')) {
+      return {
+        type: 'string',
+        value: `${this.runtimeValueToString(left)}${this.runtimeValueToString(right)}`,
+      };
+    }
+
     if (isEqualityOperator(expression.operator)) {
       const value = areRuntimeValuesEqual(left, right);
 

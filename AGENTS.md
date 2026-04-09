@@ -19,6 +19,7 @@ This file tracks working conventions for the `fast` language project so future c
 - `val` is immutable.
 - only `var` can be reassigned.
 - Arithmetic operators currently expect number operands, including `%` for modulo.
+- `+` also supports string concatenation when at least one operand is a string.
 - Comparison operators `>`, `>=`, `<`, `<=`, `==`, and `!=` return booleans.
 - Logical operators `&&` and `||` expect boolean operands and short-circuit.
 - Nullish coalescing `??` returns the right value only when the left value is `null`.

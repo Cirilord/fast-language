@@ -8,6 +8,7 @@ Right now the project is implemented in TypeScript and already supports:
 - constant declarations with `val`
 - reassignment for `var`
 - arithmetic expressions with `+`, `-`, `*`, `/`, `%`, unary `-`, unary `!`, and grouped expressions with `(...)`
+- string concatenation with `+`
 - comparison expressions with `>`, `>=`, `<`, `<=`, `==`, and `!=`
 - logical expressions with `&&`, `||`, and `??`
 - ternary expressions with `condition ? value : value`
@@ -80,6 +81,8 @@ val canPrint: boolean = shouldPrint && shouldFallback;
 val canFallback: boolean = shouldPrint || shouldFallback;
 val fallbackText: string = nullableText ?? "Default text";
 val status: string = canFallback ? "enabled" : "disabled";
+val statusMessage: string = "Status: " + status;
+val itemMessage: string = "First item: " + items[0];
 
 function getStatus(): string {
   return status;
@@ -276,6 +279,8 @@ print(canPrint);
 print(canFallback);
 print(fallbackText);
 print(status);
+print(statusMessage);
+print(itemMessage);
 print(computedStatus);
 print(genericStatus);
 print(logGenericText);
@@ -442,6 +447,7 @@ Then open a `.fast` file in the extension development window.
 - `val` creates immutable bindings
 - only `var` can be reassigned
 - arithmetic operators currently expect number operands
+- `+` also supports string concatenation when at least one operand is a string
 - compound assignment operators `+=`, `-=`, `*=`, `/=`, and `%=` also expect number operands
 - logical operators `&&` and `||` expect boolean operands and short-circuit
 - nullish coalescing `??` returns the right value only when the left value is `null`

@@ -25,6 +25,8 @@ val canPrint: boolean = shouldPrint && shouldFallback;
 val canFallback: boolean = shouldPrint || shouldFallback;
 val fallbackText: string = nullableText ?? "Default text";
 val status: string = canFallback ? "enabled" : "disabled";
+val statusMessage: string = "Status: " + status;
+val itemMessage: string = "First item: " + items[0];
 
 function getStatus(): string {
   return status;
@@ -252,6 +254,8 @@ print(canPrint);
 print(canFallback);
 print(fallbackText);
 print(status);
+print(statusMessage);
+print(itemMessage);
 print(computedStatus);
 print(genericStatus);
 // Functions also expose implicit metadata helpers.
