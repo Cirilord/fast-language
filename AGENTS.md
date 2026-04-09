@@ -59,6 +59,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Builtin runtime inspection helpers are `typeOf(value)`, `isType(value, "string")`, and `isInstance(value, ClassName)`.
 - `typeOf` returns runtime categories like `string`, `int`, `function`, `class`, `object`, `array`, and `tuple`.
 - `isType` compares the runtime category returned by `typeOf`, and `isInstance` checks class membership through inheritance.
+- `if` branches narrow identifier types when the condition uses `isType(value, "...")` or `isInstance(value, ClassName)`.
 - `throw value;` requires a value whose class extends `Error`.
 - `try { ... } except(error: ErrorType) { ... } finally { ... }` is supported.
 - `try` requires at least one `except`, `finally` is optional, duplicate `except` types are rejected, and broader earlier `except` clauses make narrower later ones unreachable.

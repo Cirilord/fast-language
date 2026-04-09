@@ -103,11 +103,27 @@ function logGenericText<T, K = string>(importedText: K, output: T): T {
   return output;
 }
 
+function logIntValue(value: int): void {
+  print(value);
+  return;
+}
+
+function logStringValue(value: string): void {
+  print(value);
+  return;
+}
+
 function logValue(value: string): void;
 function logValue(value: int): void;
 function logValue(value: unknown): void {
-  print(isType(value, "string") ? "function string" : "function int");
-  print(value);
+  if (isType(value, "string")) {
+    print("function string");
+    logStringValue(value);
+    return;
+  }
+
+  print("function int");
+  logIntValue(value);
   return;
 }
 
@@ -167,8 +183,14 @@ class Logger {
   public log(value: string): void;
   public log(value: int): void;
   public log(value: unknown): void {
-    print(isType(value, "string") ? "method string" : "method int");
-    print(value);
+    if (isType(value, "string")) {
+      print("method string");
+      logStringValue(value);
+      return;
+    }
+
+    print("method int");
+    logIntValue(value);
     return;
   }
 }
@@ -317,6 +339,27 @@ Rules:
 - any parameter position that varies across signatures must use `unknown` in the implementation
 - `unknown` is reserved for overload implementations and cannot be used in normal bindings, properties, returns, or regular parameters
 - overload groups currently do not support default parameters or rest parameters
+
+Inside `if` branches, the semantic analyzer narrows identifier types for:
+
+- `isType(value, "...")`
+- `isInstance(value, ClassName)`
+
+That makes overload implementations with `unknown` practical:
+
+```fast
+function log(value: string): void;
+function log(value: int): void;
+function log(value: unknown): void {
+  if (isType(value, "string")) {
+    logStringValue(value);
+    return;
+  }
+
+  logIntValue(value);
+  return;
+}
+```
 
 ## Project Flow
 

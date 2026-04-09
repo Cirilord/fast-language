@@ -55,11 +55,27 @@ function logGenericText<T, K = string>(importedText: K, output: T): T {
   return output;
 }
 
+function logIntValue(value: int): void {
+  print(value);
+  return;
+}
+
+function logStringValue(value: string): void {
+  print(value);
+  return;
+}
+
 function logValue(value: string): void;
 function logValue(value: int): void;
 function logValue(value: unknown): void {
-  print(isType(value, "string") ? "function string" : "function int");
-  print(value);
+  if (isType(value, "string")) {
+    print("function string");
+    logStringValue(value);
+    return;
+  }
+
+  print("function int");
+  logIntValue(value);
   return;
 }
 
@@ -119,8 +135,14 @@ class Logger {
   public log(value: string): void;
   public log(value: int): void;
   public log(value: unknown): void {
-    print(isType(value, "string") ? "method string" : "method int");
-    print(value);
+    if (isType(value, "string")) {
+      print("method string");
+      logStringValue(value);
+      return;
+    }
+
+    print("method int");
+    logIntValue(value);
     return;
   }
 }

@@ -75,6 +75,11 @@ type ResolvedClassMember = {
   owner: ClassDeclaration;
 };
 
+type TypeGuard = {
+  identifier: Identifier;
+  narrowedType: SemanticType;
+};
+
 function isNumericType(type: SemanticType): type is NumberLiteralType {
   return type === 'double' || type === 'float' || type === 'int';
 }
@@ -166,6 +171,26 @@ function containsUnknownType(type: string): boolean {
 
   const appliedType = parseAppliedGenericType(type);
   return appliedType?.args.some((arg) => containsUnknownType(arg)) ?? false;
+}
+
+function toSemanticTypeGuard(typeName: string): SemanticType | undefined {
+  switch (typeName) {
+    case 'array':
+    case 'boolean':
+    case 'double':
+    case 'float':
+    case 'function':
+    case 'int':
+    case 'null':
+    case 'string':
+    case 'tuple':
+      return typeName;
+    case 'class':
+    case 'object':
+      return undefined;
+    default:
+      return undefined;
+  }
 }
 
 function getArrayElementType(type: string): string {
@@ -1501,12 +1526,15 @@ export class SemanticAnalyzer {
 
   private analyzeIfStatement(statement: IfStatement): void {
     const conditionType = this.analyzeExpression(statement.condition);
+    const guards = this.extractTypeGuards(statement.condition);
 
     if (conditionType !== 'boolean' && conditionType !== 'unknown') {
       throw createTypeError(`If condition must be a boolean, got '${conditionType}'`);
     }
 
     this.withScope(() => {
+      this.applyTypeGuards(guards);
+
       for (const bodyStatement of statement.consequent) {
         this.analyzeStatement(bodyStatement);
       }
@@ -1912,6 +1940,21 @@ export class SemanticAnalyzer {
     });
   }
 
+  private applyTypeGuards(guards: TypeGuard[]): void {
+    for (const guard of guards) {
+      const symbol = this.scope.lookup(guard.identifier.name, guard.identifier.location);
+
+      this.scope.define(
+        {
+          ...symbol,
+          name: guard.identifier.name,
+          type: guard.narrowedType,
+        },
+        guard.identifier.location
+      );
+    }
+  }
+
   private buildAppliedGenericType(baseName: string, typeArguments: TypeName[]): TypeName {
     return typeArguments.length === 0 ? baseName : `${baseName}<${typeArguments.join(',')}>`;
   }
@@ -2218,6 +2261,58 @@ export class SemanticAnalyzer {
         statement.identifier.location
       );
     }
+  }
+
+  private extractTypeGuards(expression: Expression): TypeGuard[] {
+    if (expression.kind !== 'CallExpression' || expression.callee.kind !== 'Identifier') {
+      return [];
+    }
+
+    if (expression.callee.name === 'isType') {
+      const valueArgument = expression.arguments[0];
+      const typeArgument = expression.arguments[1];
+
+      if (valueArgument?.kind !== 'Identifier' || typeArgument?.kind !== 'StringLiteral') {
+        return [];
+      }
+
+      const narrowedType = toSemanticTypeGuard(typeArgument.value);
+
+      if (narrowedType === undefined) {
+        return [];
+      }
+
+      return [
+        {
+          identifier: valueArgument,
+          narrowedType,
+        },
+      ];
+    }
+
+    if (expression.callee.name === 'isInstance') {
+      const valueArgument = expression.arguments[0];
+      const classArgument = expression.arguments[1];
+
+      if (valueArgument?.kind !== 'Identifier' || classArgument?.kind !== 'Identifier') {
+        return [];
+      }
+
+      const classSymbol = this.scope.lookup(classArgument.name, classArgument.location);
+
+      if (classSymbol.classDeclaration === undefined) {
+        return [];
+      }
+
+      return [
+        {
+          identifier: valueArgument,
+          narrowedType: classArgument.name,
+        },
+      ];
+    }
+
+    return [];
   }
 
   private getClassDeclaration(identifier: Identifier): ClassDeclaration {
