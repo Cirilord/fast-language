@@ -44,6 +44,7 @@ Right now the project is implemented in TypeScript and already supports:
 - line comments with `//`
 - array literals with `[value, value]`
 - array index access like `items[0]`
+- array index assignment like `items[0] = "value"`
 - `for ... of` loops with optional index binding
 - classic `for` loops with initializer, condition, and increment
 - `if`, `else if`, and `else` with boolean conditions
@@ -232,6 +233,7 @@ x /= 2;
 shouldPrint &&= 10 == 10;
 shouldFallback ||= 10 == 10;
 nullableText ??= "Fallback text";
+items[0] = "updated first";
 
 for (var item, index of items) {
   print(index);
@@ -581,6 +583,7 @@ Then open a `.fast` file in the extension development window.
 - arrays use `[value, value]`
 - array types use `T[]`, like `string[]`
 - array index access uses `array[index]`, and the index must be an `int`
+- array index assignment uses `array[index] = value`, and the value must be compatible with the array element type
 - tuple types use `(T1, T2, ...)` and tuple literals use `(value1, value2, ...)`
 - `for` loops use `for (var element of array) { ... }`
 - `for` loops can access index with `for (var element, index of array) { ... }`

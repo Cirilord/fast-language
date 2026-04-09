@@ -193,6 +193,7 @@ x /= 2;
 shouldPrint &&= 10 == 10;
 shouldFallback ||= 10 == 10;
 nullableText ??= "Fallback text";
+items[0] = "updated first";
 
 for (var item, index of items) {
   print(index);

@@ -556,6 +556,26 @@ export class Interpreter {
     throw createTypeError(`Cannot assign property '${expression.property.name}' on '${object.type}'`);
   }
 
+  private assignIndex(expression: IndexExpression, value: RuntimeValue): RuntimeValue {
+    const object = this.evaluateExpression(expression.object);
+    const index = this.evaluateExpression(expression.index);
+
+    if (index.type !== 'number' || index.numberType !== 'int') {
+      throw createTypeError('Array index must be an int');
+    }
+
+    if (object.type !== 'array') {
+      throw createTypeError(`Index assignment requires an array, got '${object.type}'`);
+    }
+
+    if (object.elements[index.value] === undefined) {
+      throw createReferenceError(`Array index '${index.value}' is out of bounds`);
+    }
+
+    object.elements[index.value] = value;
+    return value;
+  }
+
   private bindParameters(parameters: Parameter[], args: RuntimeValue[]): void {
     for (const [index, parameter] of parameters.entries()) {
       if (parameter.rest) {
@@ -1297,6 +1317,10 @@ export class Interpreter {
 
     if (statement.target.kind === 'MemberExpression') {
       return this.assignMember(statement.target, value);
+    }
+
+    if (statement.target.kind === 'IndexExpression') {
+      return this.assignIndex(statement.target, value);
     }
 
     return this.scope.assign(statement.target.name, value);

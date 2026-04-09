@@ -641,6 +641,45 @@ export class SemanticAnalyzer {
   private analyzeAssignmentStatement(statement: AssignmentStatement): void {
     const type = this.analyzeExpression(statement.value);
 
+    if (statement.target.kind === 'IndexExpression') {
+      const objectType = this.analyzeExpression(statement.target.object);
+      const indexType = this.analyzeExpression(statement.target.index);
+
+      if (indexType !== 'int' && indexType !== 'unknown') {
+        throw createTypeError(`Array index must be an int, got '${indexType}'`);
+      }
+
+      if (objectType !== 'array' && !isArrayType(objectType) && objectType !== 'unknown') {
+        throw createTypeError(`Index assignment requires an array, got '${objectType}'`);
+      }
+
+      const elementType =
+        objectType === 'array' || objectType === 'unknown' ? 'unknown' : getArrayElementType(objectType);
+
+      if (statement.operator === '=' || statement.operator === '??=') {
+        if (!areTypesCompatible(elementType, type)) {
+          throw createTypeError(`Cannot assign value of type '${type}' to array element of type '${elementType}'`);
+        }
+
+        return;
+      }
+
+      if (statement.operator === '&&=' || statement.operator === '||=') {
+        if ((elementType !== 'boolean' && elementType !== 'unknown') || (type !== 'boolean' && type !== 'unknown')) {
+          throw createTypeError(`Operator '${statement.operator}' expects boolean operands`);
+        }
+
+        return;
+      }
+
+      if (!isNumericType(elementType) || !isNumericType(type)) {
+        throw createTypeError(`Operator '${statement.operator}' expects number operands`);
+      }
+
+      toBinaryOperator(statement.operator);
+      return;
+    }
+
     if (statement.target.kind === 'MemberExpression') {
       const resolved = this.resolveMemberExpression(statement.target);
 

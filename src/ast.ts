@@ -41,7 +41,7 @@ export type BreakStatement = {
   kind: 'BreakStatement';
 };
 
-export type AssignmentTarget = Identifier | MemberExpression;
+export type AssignmentTarget = Identifier | IndexExpression | MemberExpression;
 
 export type AccessModifier = 'private' | 'protected' | 'public';
 

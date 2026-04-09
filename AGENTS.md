@@ -41,6 +41,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Line comments start with `//` and run until the end of the line.
 - Arrays use `[value, value]`, and array types use `T[]`, like `string[]`.
 - Array index access uses `array[index]`, and the index must be an `int`.
+- Array index assignment uses `array[index] = value`, and the value must be compatible with the array element type.
 - Tuple types use `(T1, T2, ...)`, and tuple literals use `(value1, value2, ...)`.
 - `for` loops use `for (var element of array) { ... }`.
 - `for` loops can access index with `for (var element, index of array) { ... }`.

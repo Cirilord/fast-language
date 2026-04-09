@@ -655,7 +655,9 @@ export class Parser {
     const expression = this.parseExpression();
 
     if (
-      (expression.kind === 'Identifier' || expression.kind === 'MemberExpression') &&
+      (expression.kind === 'Identifier' ||
+        expression.kind === 'IndexExpression' ||
+        expression.kind === 'MemberExpression') &&
       this.isAssignmentOperatorToken(this.peek().type)
     ) {
       return this.parseAssignmentStatementWithoutTerminator(expression);
@@ -671,7 +673,9 @@ export class Parser {
     const expression = this.parseExpression();
 
     if (
-      (expression.kind === 'Identifier' || expression.kind === 'MemberExpression') &&
+      (expression.kind === 'Identifier' ||
+        expression.kind === 'IndexExpression' ||
+        expression.kind === 'MemberExpression') &&
       this.isAssignmentOperatorToken(this.peek().type)
     ) {
       return this.parseAssignmentStatementWithoutTerminator(expression);
@@ -1080,7 +1084,9 @@ export class Parser {
     const expression = this.parseExpression();
 
     if (
-      (expression.kind === 'Identifier' || expression.kind === 'MemberExpression') &&
+      (expression.kind === 'Identifier' ||
+        expression.kind === 'IndexExpression' ||
+        expression.kind === 'MemberExpression') &&
       this.isAssignmentOperatorToken(this.peek().type)
     ) {
       return this.parseAssignmentStatement(expression);
