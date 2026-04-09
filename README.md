@@ -40,6 +40,7 @@ Right now the project is implemented in TypeScript and already supports:
 - builtin namespace modules like `import String from "string";`
 - named exports with `export var`, `export val`, `export function`, and `export name;`
 - symbolic enums like `enum Status { Pending, Done }`
+- byte declarations like `val channel: byte = 255;`
 - typed numeric declarations like `var count: int = 10;`
 - typed variable declarations like `var name: string = "Fast";`
 - inferred variable declarations like `var name = "Fast";`
@@ -660,10 +661,10 @@ Then open a `.fast` file in the extension development window.
 - parentheses can be used to group arithmetic expressions
 - integer literals do not use decimal points, like `10`
 - decimal literals use decimal points, like `20.0`
-- numeric variable types are `int`, `float`, and `double`
+- numeric variable types are `byte`, `int`, `float`, and `double`
 - variable declarations can include a type annotation, like `var name: string = "Fast";`
 - variable declarations can infer type from non-null initializers, like `var name = "Fast";`
-- accepted variable types include `boolean`, `double`, `float`, `int`, `string`, declared class names, typed arrays like `string[]`, and tuple types like `(string,int)`
+- accepted variable types include `boolean`, `byte`, `double`, `float`, `int`, `string`, declared class names, typed arrays like `string[]`, and tuple types like `(string,int)`
 - `null` declarations require an explicit declared type, like `var name: string = null;`
 - named imports use `import { name } from "./file";` and resolve local `.fast` files
 - named exports can be inline, like `export var name = "Fast";`
@@ -674,7 +675,7 @@ Then open a `.fast` file in the extension development window.
 - line comments start with `//` and run until the end of the line
 - arrays use `[value, value]`
 - array types use `T[]`, like `string[]`
-- array index access uses `array[index]`, and the index must be an `int`
+- array index access uses `array[index]`, and the index must be an `int` or `byte`
 - array index assignment uses `array[index] = value`, and the value must be compatible with the array element type
 - tuple types use `(T1, T2, ...)` and tuple literals use `(value1, value2, ...)`
 - `for` loops use `for (var element of array) { ... }`
@@ -688,7 +689,7 @@ Then open a `.fast` file in the extension development window.
 - function return values must match the declared return type
 - functions that do not return a value use `void`, like `function name(): void { ... }`
 - named functions expose implicit `name` and `toString()`, like `logGenericText.name` and `logGenericText.toString()`
-- `typeOf(value)` returns runtime categories like `"string"`, `"int"`, `"function"`, `"class"`, `"enum"`, `"object"`, `"array"`, and `"tuple"`
+- `typeOf(value)` returns runtime categories like `"string"`, `"byte"`, `"int"`, `"function"`, `"class"`, `"enum"`, `"object"`, `"array"`, and `"tuple"`
 - `isType(value, "string")` compares the runtime category returned by `typeOf`
 - `isInstance(value, ClassName)` checks whether an object instance belongs to a class or one of its base classes
 - `throw value;` requires a value whose class extends `Error`

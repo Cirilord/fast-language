@@ -29,18 +29,18 @@ This file tracks working conventions for the `fast` language project so future c
 - Nullish assignment `??=` assigns only when the current value is `null`.
 - Parentheses can group arithmetic expressions.
 - Unary `-` can be used with numbers and grouped numeric expressions, and unary `!` can be used with boolean expressions.
-- Number literals no longer use suffixes; numeric variable types are `int`, `float`, and `double`.
+- Number literals no longer use suffixes; numeric variable types are `byte`, `int`, `float`, and `double`.
 - Integer literals do not use decimal points, like `10`; decimal literals use decimal points, like `20.0`.
 - Variable declarations can include a type annotation, like `var name: string = "Fast";`.
 - Variable declarations can infer type from non-null initializers, like `var name = "Fast";`.
-- Accepted variable types include `boolean`, `double`, `float`, `int`, `string`, declared class names, typed arrays like `string[]`, and tuple types like `(string,int)`.
+- Accepted variable types include `boolean`, `byte`, `double`, `float`, `int`, `string`, declared class names, typed arrays like `string[]`, and tuple types like `(string,int)`.
 - `null` declarations require an explicit declared type, like `var name: string = null;`.
 - `print` is not a lexer keyword; it is tokenized as `IDENTIFIER`.
 - Normal strings use `"`.
 - Multiline strings use `` ` ``.
 - Line comments start with `//` and run until the end of the line.
 - Arrays use `[value, value]`, and array types use `T[]`, like `string[]`.
-- Array index access uses `array[index]`, and the index must be an `int`.
+- Array index access uses `array[index]`, and the index must be an `int` or `byte`.
 - Array index assignment uses `array[index] = value`, and the value must be compatible with the array element type.
 - Tuple types use `(T1, T2, ...)`, and tuple literals use `(value1, value2, ...)`.
 - `for` loops use `for (var element of array) { ... }`.
@@ -66,7 +66,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Functions that do not return a value use `void`, like `function name(): void { ... }`.
 - Named functions expose implicit `name` and `toString()`, like `logGenericText.name` and `logGenericText.toString()`.
 - Builtin runtime inspection helpers are `typeOf(value)`, `isType(value, "string")`, and `isInstance(value, ClassName)`.
-- `typeOf` returns runtime categories like `string`, `int`, `function`, `class`, `enum`, `object`, `array`, and `tuple`.
+- `typeOf` returns runtime categories like `string`, `byte`, `int`, `function`, `class`, `enum`, `object`, `array`, and `tuple`.
 - `isType` compares the runtime category returned by `typeOf`, and `isInstance` checks class membership through inheritance.
 - `if` branches narrow identifier types when the condition uses `isType(value, "...")` or `isInstance(value, ClassName)`.
 - Narrowing also propagates through `&&`, and `||` preserves only guards shared by both sides, including nested conditions under `!`.

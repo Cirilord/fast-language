@@ -89,7 +89,7 @@ function createUnaryNumericOverloads(
 }
 
 function createBinaryNumericOverloads(returnType: string): CallableSignature[] {
-  const numberTypes: NumberLiteralType[] = ['int', 'float', 'double'];
+  const numberTypes: NumberLiteralType[] = ['byte', 'int', 'float', 'double'];
   return numberTypes.flatMap((leftType) =>
     numberTypes.map((rightType) => createSignature([leftType, rightType], returnType))
   );
@@ -122,8 +122,8 @@ function expectArrayArgument(value: RuntimeValue | undefined, functionName: stri
 }
 
 function expectIntegerArgument(value: RuntimeValue | undefined, functionName: string, index: number): number {
-  if (value?.type !== 'number' || value.numberType !== 'int') {
-    throw createTypeError(`'${functionName}' expects int at argument ${index}`);
+  if (value?.type !== 'number' || (value.numberType !== 'byte' && value.numberType !== 'int')) {
+    throw createTypeError(`'${functionName}' expects integer at argument ${index}`);
   }
 
   return value.value;

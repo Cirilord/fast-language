@@ -309,7 +309,7 @@ export type NumberLiteral = {
   value: number;
 };
 
-export type NumberLiteralType = 'double' | 'float' | 'int';
+export type NumberLiteralType = 'byte' | 'double' | 'float' | 'int';
 
 export type NullLiteral = {
   kind: 'NullLiteral';

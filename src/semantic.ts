@@ -125,7 +125,7 @@ function emptyBranchTypeGuards(): BranchTypeGuards {
 }
 
 function isNumericType(type: SemanticType): type is NumberLiteralType {
-  return type === 'double' || type === 'float' || type === 'int';
+  return type === 'byte' || type === 'double' || type === 'float' || type === 'int';
 }
 
 function isArrayType(type: SemanticType): boolean {
@@ -197,6 +197,16 @@ function canSwitchCompareTypes(leftType: SemanticType, rightType: SemanticType):
 
   if (isNumericType(leftType) && isNumericType(rightType)) {
     return true;
+  }
+
+  if (isTupleType(leftType) && isTupleType(rightType)) {
+    const leftElements = splitTupleTypes(leftType);
+    const rightElements = splitTupleTypes(rightType);
+
+    return (
+      leftElements.length === rightElements.length &&
+      leftElements.every((elementType, index) => canSwitchCompareTypes(elementType, rightElements[index] ?? 'unknown'))
+    );
   }
 
   return leftType === rightType;
@@ -461,6 +471,10 @@ function areTypesCompatible(expectedType: SemanticType, actualType: SemanticType
     return true;
   }
 
+  if (expectedType === 'int' && actualType === 'byte') {
+    return true;
+  }
+
   if (expectedType === 'array') {
     return actualType === 'array' || actualType === 'unknown[]' || isArrayType(actualType);
   }
@@ -494,7 +508,11 @@ function areTypesCompatible(expectedType: SemanticType, actualType: SemanticType
     );
   }
 
-  return expectedType === 'float' && actualType === 'double';
+  if (expectedType === 'float' && actualType === 'double') {
+    return true;
+  }
+
+  return false;
 }
 
 function isEqualityOperator(operator: BinaryOperator): boolean {
@@ -758,7 +776,7 @@ export class SemanticAnalyzer {
       const objectType = this.analyzeExpression(statement.target.object);
       const indexType = this.analyzeExpression(statement.target.index);
 
-      if (indexType !== 'int' && indexType !== 'unknown') {
+      if (indexType !== 'byte' && indexType !== 'int' && indexType !== 'unknown') {
         throw createTypeError(`Array index must be an int, got '${indexType}'`);
       }
 
@@ -2063,7 +2081,7 @@ export class SemanticAnalyzer {
     const objectType = this.analyzeExpression(expression.object);
     const indexType = this.analyzeExpression(expression.index);
 
-    if (indexType !== 'int' && indexType !== 'unknown') {
+    if (indexType !== 'byte' && indexType !== 'int' && indexType !== 'unknown') {
       throw createTypeError(`Array index must be an int, got '${indexType}'`);
     }
 
@@ -2444,7 +2462,7 @@ export class SemanticAnalyzer {
       throw createTypeError(`Operator '${expression.operator}' expects a number operand`);
     }
 
-    return argumentType;
+    return argumentType === 'byte' ? 'int' : argumentType;
   }
 
   private analyzeVariableDeclaration(statement: VariableDeclaration): void {

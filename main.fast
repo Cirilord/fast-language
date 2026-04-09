@@ -5,6 +5,7 @@ import File1, { importedText, logImportedText } from "./file1";
 
 // Number types are declared on variables.
 var a: int = 30;
+val channel: byte = 255;
 val b: string = "Test";
 val items: string[] = ["first", "second", "third"];
 val itemsCopy: string[] = Array.concat(items, []);
@@ -338,6 +339,7 @@ switch (loadState) {
 a = 50;
 
 print(a);
+print(channel);
 print(b);
 print(result);
 print(directNegative);

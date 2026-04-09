@@ -206,6 +206,10 @@ function promoteNumberType(
   return 'int';
 }
 
+function isByteValue(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= 255;
+}
+
 function areRuntimeValuesEqual(left: RuntimeValue, right: RuntimeValue): boolean {
   if (left.type !== right.type) {
     return false;
@@ -282,11 +286,17 @@ function toBinaryOperator(operator: AssignmentOperator): BinaryOperator {
 }
 
 function isNumericTypeAnnotation(typeAnnotation: TypeName | undefined): typeAnnotation is NumberLiteralType {
-  return typeAnnotation === 'double' || typeAnnotation === 'float' || typeAnnotation === 'int';
+  return (
+    typeAnnotation === 'byte' || typeAnnotation === 'double' || typeAnnotation === 'float' || typeAnnotation === 'int'
+  );
 }
 
 function coerceValueToBindingType(value: RuntimeValue, typeAnnotation: TypeName | undefined): RuntimeValue {
   if (value.type === 'number' && isNumericTypeAnnotation(typeAnnotation)) {
+    if (typeAnnotation === 'byte' && !isByteValue(value.value)) {
+      throw createTypeError(`Cannot assign value '${value.value}' to type 'byte'`);
+    }
+
     return {
       ...value,
       numberType: typeAnnotation,
@@ -534,7 +544,7 @@ export class Interpreter {
     const object = this.evaluateExpression(expression.object);
     const index = this.evaluateExpression(expression.index);
 
-    if (index.type !== 'number' || index.numberType !== 'int') {
+    if (index.type !== 'number' || (index.numberType !== 'byte' && index.numberType !== 'int')) {
       throw createTypeError('Array index must be an int');
     }
 
@@ -1082,7 +1092,7 @@ export class Interpreter {
     const object = this.evaluateExpression(expression.object);
     const index = this.evaluateExpression(expression.index);
 
-    if (index.type !== 'number' || index.numberType !== 'int') {
+    if (index.type !== 'number' || (index.numberType !== 'byte' && index.numberType !== 'int')) {
       throw createTypeError('Array index must be an int');
     }
 
@@ -1340,7 +1350,7 @@ export class Interpreter {
     }
 
     return {
-      numberType: argument.numberType,
+      numberType: argument.numberType === 'byte' ? 'int' : argument.numberType,
       type: 'number',
       value: -argument.value,
     };

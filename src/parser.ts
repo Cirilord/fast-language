@@ -117,10 +117,12 @@ export class Parser {
   }
 
   private createNumberLiteral(token: Token): NumberLiteral {
+    const value = Number(token.lexeme);
+
     return {
       kind: 'NumberLiteral',
-      numberType: token.lexeme.includes('.') ? 'double' : 'int',
-      value: Number(token.lexeme),
+      numberType: token.lexeme.includes('.') ? 'double' : value >= 0 && value <= 255 ? 'byte' : 'int',
+      value,
     };
   }
 
