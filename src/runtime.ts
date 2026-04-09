@@ -5,9 +5,9 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
-  ClassicForStatement,
   ClassConstructor,
   ClassDeclaration,
+  ClassicForStatement,
   ClassMethod,
   ClassProperty,
   ConditionalExpression,
@@ -520,6 +520,26 @@ export class Interpreter {
     }
   }
 
+  private assignIndex(expression: IndexExpression, value: RuntimeValue): RuntimeValue {
+    const object = this.evaluateExpression(expression.object);
+    const index = this.evaluateExpression(expression.index);
+
+    if (index.type !== 'number' || index.numberType !== 'int') {
+      throw createTypeError('Array index must be an int');
+    }
+
+    if (object.type !== 'array') {
+      throw createTypeError(`Index assignment requires an array, got '${object.type}'`);
+    }
+
+    if (object.elements[index.value] === undefined) {
+      throw createReferenceError(`Array index '${index.value}' is out of bounds`);
+    }
+
+    object.elements[index.value] = value;
+    return value;
+  }
+
   private assignMember(expression: MemberExpression, value: RuntimeValue): RuntimeValue {
     const object = this.evaluateExpression(expression.object);
 
@@ -554,26 +574,6 @@ export class Interpreter {
     }
 
     throw createTypeError(`Cannot assign property '${expression.property.name}' on '${object.type}'`);
-  }
-
-  private assignIndex(expression: IndexExpression, value: RuntimeValue): RuntimeValue {
-    const object = this.evaluateExpression(expression.object);
-    const index = this.evaluateExpression(expression.index);
-
-    if (index.type !== 'number' || index.numberType !== 'int') {
-      throw createTypeError('Array index must be an int');
-    }
-
-    if (object.type !== 'array') {
-      throw createTypeError(`Index assignment requires an array, got '${object.type}'`);
-    }
-
-    if (object.elements[index.value] === undefined) {
-      throw createReferenceError(`Array index '${index.value}' is out of bounds`);
-    }
-
-    object.elements[index.value] = value;
-    return value;
   }
 
   private bindParameters(parameters: Parameter[], args: RuntimeValue[]): void {
@@ -1385,11 +1385,6 @@ export class Interpreter {
     });
   }
 
-  private executeEnumDeclaration(statement: EnumDeclaration): RuntimeValue {
-    const enumValue = this.createEnumValue(statement);
-    return this.scope.define(statement.identifier.name, enumValue, false);
-  }
-
   private executeContinueStatement(): RuntimeValue {
     throw new ContinueSignal();
   }
@@ -1429,6 +1424,11 @@ export class Interpreter {
     } while (shouldContinue);
 
     return lastValue;
+  }
+
+  private executeEnumDeclaration(statement: EnumDeclaration): RuntimeValue {
+    const enumValue = this.createEnumValue(statement);
+    return this.scope.define(statement.identifier.name, enumValue, false);
   }
 
   private executeExportDeclaration(statement: ExportDeclaration): RuntimeValue {
@@ -1907,12 +1907,12 @@ export class Interpreter {
     return `${declarationKind} ${classValue.name} { ... }`;
   }
 
-  private renderEnumValue(enumValue: EnumValue): string {
-    return `enum ${enumValue.name} { ... }`;
-  }
-
   private renderEnumMemberValue(enumMemberValue: EnumMemberValue): string {
     return `${enumMemberValue.enumValue.name}.${enumMemberValue.name}`;
+  }
+
+  private renderEnumValue(enumValue: EnumValue): string {
+    return `enum ${enumValue.name} { ... }`;
   }
 
   private renderInstanceValue(instance: InstanceValue): string {

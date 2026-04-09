@@ -5,9 +5,9 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
-  ClassicForStatement,
   ClassConstructor,
   ClassDeclaration,
+  ClassicForStatement,
   ClassMethod,
   ClassProperty,
   ConditionalExpression,
@@ -1240,6 +1240,34 @@ export class SemanticAnalyzer {
     }
   }
 
+  private analyzeClassicForStatement(statement: ClassicForStatement): void {
+    this.withLoop(() => {
+      this.withScope(() => {
+        if (statement.initializer !== undefined) {
+          this.analyzeStatement(statement.initializer);
+        }
+
+        if (statement.condition !== undefined) {
+          const conditionType = this.analyzeExpression(statement.condition);
+
+          if (conditionType !== 'boolean' && conditionType !== 'unknown') {
+            throw createTypeError(`For condition must be a boolean, got '${conditionType}'`);
+          }
+        }
+
+        this.withScope(() => {
+          for (const bodyStatement of statement.body) {
+            this.analyzeStatement(bodyStatement);
+          }
+        });
+
+        if (statement.increment !== undefined) {
+          this.analyzeStatement(statement.increment);
+        }
+      });
+    });
+  }
+
   private analyzeConditionalExpression(expression: ConditionalExpression): SemanticType {
     const testType = this.analyzeExpression(expression.test);
 
@@ -1453,34 +1481,6 @@ export class SemanticAnalyzer {
 
         for (const bodyStatement of statement.body) {
           this.analyzeStatement(bodyStatement);
-        }
-      });
-    });
-  }
-
-  private analyzeClassicForStatement(statement: ClassicForStatement): void {
-    this.withLoop(() => {
-      this.withScope(() => {
-        if (statement.initializer !== undefined) {
-          this.analyzeStatement(statement.initializer);
-        }
-
-        if (statement.condition !== undefined) {
-          const conditionType = this.analyzeExpression(statement.condition);
-
-          if (conditionType !== 'boolean' && conditionType !== 'unknown') {
-            throw createTypeError(`For condition must be a boolean, got '${conditionType}'`);
-          }
-        }
-
-        this.withScope(() => {
-          for (const bodyStatement of statement.body) {
-            this.analyzeStatement(bodyStatement);
-          }
-        });
-
-        if (statement.increment !== undefined) {
-          this.analyzeStatement(statement.increment);
         }
       });
     });
@@ -2992,6 +2992,15 @@ export class SemanticAnalyzer {
     return left.every((parameter, index) => parameter.typeAnnotation === right[index]?.typeAnnotation);
   }
 
+  private isEnumType(type: SemanticType): boolean {
+    if (typeof type !== 'string') {
+      return false;
+    }
+
+    const symbol = this.scope.lookupOptional(type);
+    return symbol?.enumDeclaration !== undefined;
+  }
+
   private isSameOrSubclass(candidate: ClassDeclaration, base: ClassDeclaration): boolean {
     if (candidate.identifier.name === base.identifier.name) {
       return true;
@@ -3002,15 +3011,6 @@ export class SemanticAnalyzer {
     }
 
     return this.isSameOrSubclass(this.getClassDeclaration(candidate.baseClass), base);
-  }
-
-  private isEnumType(type: SemanticType): boolean {
-    if (typeof type !== 'string') {
-      return false;
-    }
-
-    const symbol = this.scope.lookupOptional(type);
-    return symbol?.enumDeclaration !== undefined;
   }
 
   private isSwitchComparableType(type: SemanticType): boolean {
@@ -3055,6 +3055,33 @@ export class SemanticAnalyzer {
     }
 
     return this.buildTypeArgumentMap(statement.typeParameters, [], new Map(), location, statement.identifier.name);
+  }
+
+  private resolveEnumMemberExpression(expression: MemberExpression): ResolvedEnumMember {
+    if (expression.object.kind !== 'Identifier') {
+      throw createTypeError('Enum member access requires an enum identifier', expression.property.location);
+    }
+
+    const objectSymbol = this.scope.lookup(expression.object.name, expression.object.location);
+    const enumDeclaration = objectSymbol.enumDeclaration;
+
+    if (enumDeclaration === undefined) {
+      throw createTypeError(`Binding '${expression.object.name}' is not an enum`, expression.object.location);
+    }
+
+    const member = enumDeclaration.members.find((enumMember) => enumMember.name === expression.property.name);
+
+    if (member === undefined) {
+      throw createReferenceError(
+        `Enum member '${expression.property.name}' is not defined`,
+        expression.property.location
+      );
+    }
+
+    return {
+      member,
+      owner: enumDeclaration,
+    };
   }
 
   private resolveMemberExpression(expression: MemberExpression): ResolvedClassMember {
@@ -3146,33 +3173,6 @@ export class SemanticAnalyzer {
 
     this.ensureMemberIsAccessible(member, expression.property.location);
     return member;
-  }
-
-  private resolveEnumMemberExpression(expression: MemberExpression): ResolvedEnumMember {
-    if (expression.object.kind !== 'Identifier') {
-      throw createTypeError('Enum member access requires an enum identifier', expression.property.location);
-    }
-
-    const objectSymbol = this.scope.lookup(expression.object.name, expression.object.location);
-    const enumDeclaration = objectSymbol.enumDeclaration;
-
-    if (enumDeclaration === undefined) {
-      throw createTypeError(`Binding '${expression.object.name}' is not an enum`, expression.object.location);
-    }
-
-    const member = enumDeclaration.members.find((enumMember) => enumMember.name === expression.property.name);
-
-    if (member === undefined) {
-      throw createReferenceError(
-        `Enum member '${expression.property.name}' is not defined`,
-        expression.property.location
-      );
-    }
-
-    return {
-      member,
-      owner: enumDeclaration,
-    };
   }
 
   private resolveOverloadSignature(

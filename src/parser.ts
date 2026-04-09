@@ -7,10 +7,10 @@ import type {
   BinaryOperator,
   BreakStatement,
   CallExpression,
-  ClassicForClause,
-  ClassicForStatement,
   ClassConstructor,
   ClassDeclaration,
+  ClassicForClause,
+  ClassicForStatement,
   ClassMember,
   ClassMethod,
   ClassProperty,
@@ -418,6 +418,50 @@ export class Parser {
     throw this.error(this.peek(), "Expected '(' after method name or 'var'/'val' before property name.");
   }
 
+  private parseClassicForClause(): ClassicForClause {
+    if (this.match(TokenType.Var)) {
+      return this.parseVariableDeclaration('var', false);
+    }
+
+    if (this.match(TokenType.Val)) {
+      return this.parseVariableDeclaration('val', false);
+    }
+
+    const expression = this.parseExpression();
+
+    if (
+      (expression.kind === 'Identifier' ||
+        expression.kind === 'IndexExpression' ||
+        expression.kind === 'MemberExpression') &&
+      this.isAssignmentOperatorToken(this.peek().type)
+    ) {
+      return this.parseAssignmentStatementWithoutTerminator(expression);
+    }
+
+    return {
+      expression,
+      kind: 'ExpressionStatement',
+    } satisfies ExpressionStatement;
+  }
+
+  private parseClassicForIncrement(): AssignmentStatement | ExpressionStatement {
+    const expression = this.parseExpression();
+
+    if (
+      (expression.kind === 'Identifier' ||
+        expression.kind === 'IndexExpression' ||
+        expression.kind === 'MemberExpression') &&
+      this.isAssignmentOperatorToken(this.peek().type)
+    ) {
+      return this.parseAssignmentStatementWithoutTerminator(expression);
+    }
+
+    return {
+      expression,
+      kind: 'ExpressionStatement',
+    } satisfies ExpressionStatement;
+  }
+
   private parseComparison(): Expression {
     let expression = this.parseTerm();
 
@@ -617,76 +661,6 @@ export class Parser {
     };
   }
 
-  private parseForStatement(): ForStatement {
-    this.consume(TokenType.LeftParen, "Expected '(' after 'for'.");
-    this.consume(TokenType.Var, "Expected 'var' in for loop declaration.");
-    const element = this.consume(TokenType.Identifier, 'Expected element identifier in for loop.');
-    const index = this.match(TokenType.Comma)
-      ? this.consume(TokenType.Identifier, "Expected index identifier after ','.")
-      : null;
-
-    this.consume(TokenType.Of, "Expected 'of' in for loop.");
-    const iterable = this.parseExpression();
-    this.consume(TokenType.RightParen, "Expected ')' after for loop declaration.");
-
-    const forStatement: ForStatement = {
-      body: this.parseBlockStatement(),
-      element: this.createIdentifier(element),
-      iterable,
-      kind: 'ForStatement',
-    };
-
-    if (index !== null) {
-      forStatement.index = this.createIdentifier(index);
-    }
-
-    return forStatement;
-  }
-
-  private parseClassicForClause(): ClassicForClause {
-    if (this.match(TokenType.Var)) {
-      return this.parseVariableDeclaration('var', false);
-    }
-
-    if (this.match(TokenType.Val)) {
-      return this.parseVariableDeclaration('val', false);
-    }
-
-    const expression = this.parseExpression();
-
-    if (
-      (expression.kind === 'Identifier' ||
-        expression.kind === 'IndexExpression' ||
-        expression.kind === 'MemberExpression') &&
-      this.isAssignmentOperatorToken(this.peek().type)
-    ) {
-      return this.parseAssignmentStatementWithoutTerminator(expression);
-    }
-
-    return {
-      expression,
-      kind: 'ExpressionStatement',
-    } satisfies ExpressionStatement;
-  }
-
-  private parseClassicForIncrement(): AssignmentStatement | ExpressionStatement {
-    const expression = this.parseExpression();
-
-    if (
-      (expression.kind === 'Identifier' ||
-        expression.kind === 'IndexExpression' ||
-        expression.kind === 'MemberExpression') &&
-      this.isAssignmentOperatorToken(this.peek().type)
-    ) {
-      return this.parseAssignmentStatementWithoutTerminator(expression);
-    }
-
-    return {
-      expression,
-      kind: 'ExpressionStatement',
-    } satisfies ExpressionStatement;
-  }
-
   private parseForLoopStatement(): ClassicForStatement | ForStatement {
     this.consume(TokenType.LeftParen, "Expected '(' after 'for'.");
 
@@ -732,6 +706,32 @@ export class Parser {
     statement.body = this.parseBlockStatement();
 
     return statement;
+  }
+
+  private parseForStatement(): ForStatement {
+    this.consume(TokenType.LeftParen, "Expected '(' after 'for'.");
+    this.consume(TokenType.Var, "Expected 'var' in for loop declaration.");
+    const element = this.consume(TokenType.Identifier, 'Expected element identifier in for loop.');
+    const index = this.match(TokenType.Comma)
+      ? this.consume(TokenType.Identifier, "Expected index identifier after ','.")
+      : null;
+
+    this.consume(TokenType.Of, "Expected 'of' in for loop.");
+    const iterable = this.parseExpression();
+    this.consume(TokenType.RightParen, "Expected ')' after for loop declaration.");
+
+    const forStatement: ForStatement = {
+      body: this.parseBlockStatement(),
+      element: this.createIdentifier(element),
+      iterable,
+      kind: 'ForStatement',
+    };
+
+    if (index !== null) {
+      forStatement.index = this.createIdentifier(index);
+    }
+
+    return forStatement;
   }
 
   private parseFunctionDeclaration(): FunctionDeclaration {
