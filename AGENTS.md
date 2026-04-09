@@ -62,7 +62,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Functions that do not return a value use `void`, like `function name(): void { ... }`.
 - Named functions expose implicit `name` and `toString()`, like `logGenericText.name` and `logGenericText.toString()`.
 - Builtin runtime inspection helpers are `typeOf(value)`, `isType(value, "string")`, and `isInstance(value, ClassName)`.
-- `typeOf` returns runtime categories like `string`, `int`, `function`, `class`, `object`, `array`, and `tuple`.
+- `typeOf` returns runtime categories like `string`, `int`, `function`, `class`, `enum`, `object`, `array`, and `tuple`.
 - `isType` compares the runtime category returned by `typeOf`, and `isInstance` checks class membership through inheritance.
 - `if` branches narrow identifier types when the condition uses `isType(value, "...")` or `isInstance(value, ClassName)`.
 - Narrowing also propagates through `&&`, and `||` preserves only guards shared by both sides, including nested conditions under `!`.
@@ -92,6 +92,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Builtin error classes include `Error`, `TypeError`, and `ReferenceError`.
 - Named imports use `import { name } from "./file";` and resolve local `.fast` files.
 - Named exports can be inline, like `export var name = "Fast";`.
+- Enums use `enum Name { Member, Member }`, members are accessed like `Name.Member`, and enum values compare by equality and work in `switch`.
 - Named exports can reference existing bindings, like `export name;`.
 - Imported bindings are immutable in the importing module.
 

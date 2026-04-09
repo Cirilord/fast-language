@@ -15,6 +15,7 @@ import type {
   ConditionalExpression,
   ContinueStatement,
   DoWhileStatement,
+  EnumDeclaration,
   ExceptClause,
   ExportDeclaration,
   Expression,
@@ -464,6 +465,29 @@ export class Parser {
     };
   }
 
+  private parseEnumDeclaration(): EnumDeclaration {
+    const name = this.consume(TokenType.Identifier, "Expected enum name after 'enum'.");
+    this.consume(TokenType.LeftBrace, "Expected '{' before enum body.");
+    const members: Identifier[] = [];
+
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      const member = this.consume(TokenType.Identifier, 'Expected enum member name.');
+      members.push(this.createIdentifier(member));
+
+      if (!this.match(TokenType.Comma)) {
+        break;
+      }
+    }
+
+    this.consume(TokenType.RightBrace, "Expected '}' after enum body.");
+
+    return {
+      identifier: this.createIdentifier(name),
+      kind: 'EnumDeclaration',
+      members,
+    };
+  }
+
   private parseEquality(): Expression {
     let expression = this.parseComparison();
 
@@ -515,6 +539,13 @@ export class Parser {
     if (this.match(TokenType.Function)) {
       return {
         declaration: this.parseFunctionDeclaration(),
+        kind: 'ExportDeclaration',
+      };
+    }
+
+    if (this.match(TokenType.Enum)) {
+      return {
+        declaration: this.parseEnumDeclaration(),
         kind: 'ExportDeclaration',
       };
     }
@@ -895,6 +926,10 @@ export class Parser {
 
     if (this.match(TokenType.Function)) {
       return this.parseFunctionDeclaration();
+    }
+
+    if (this.match(TokenType.Enum)) {
+      return this.parseEnumDeclaration();
     }
 
     if (this.match(TokenType.If)) {

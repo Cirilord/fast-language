@@ -12,6 +12,7 @@ const KEYWORDS: Record<string, TokenType> = Object.assign(Object.create(null), {
   default: TokenType.Default,
   do: TokenType.Do,
   else: TokenType.Else,
+  enum: TokenType.Enum,
   except: TokenType.Except,
   extends: TokenType.Extends,
   export: TokenType.Export,

@@ -32,6 +32,7 @@ Right now the project is implemented in TypeScript and already supports:
 - classes expose an implicit `toString()`, instances can override `toString(): string`, and `print(instance)` uses it automatically
 - named imports with `import { name } from "./file";`
 - named exports with `export var`, `export val`, `export function`, and `export name;`
+- symbolic enums like `enum Status { Pending, Done }`
 - typed numeric declarations like `var count: int = 10;`
 - typed variable declarations like `var name: string = "Fast";`
 - inferred variable declarations like `var name = "Fast";`
@@ -84,6 +85,12 @@ val fallbackText: string = nullableText ?? "Default text";
 val status: string = canFallback ? "enabled" : "disabled";
 val statusMessage: string = "Status: " + status;
 val itemMessage: string = "First item: " + items[0];
+
+enum LoadState {
+  Idle,
+  Loading,
+  Done
+}
 
 function getStatus(): string {
   return status;
@@ -208,6 +215,7 @@ class AppError extends Error {
   }
 }
 
+val loadState: LoadState = LoadState.Idle;
 val computedStatus: string = getStatus();
 val genericStatus: string = identity<string>(status);
 val importedStatus: string = logGenericText<string>("Imported generic text", status);
@@ -289,6 +297,16 @@ switch (profile) {
   }
 }
 
+switch (loadState) {
+  case LoadState.Idle {
+    print("enum switch idle");
+  }
+
+  default {
+    print("enum switch fallback");
+  }
+}
+
 print(result);
 print(directNegative);
 print(negative);
@@ -316,6 +334,8 @@ print(typeOf(logGenericText));
 print(typeOf(User));
 print(typeOf(user));
 print(typeOf(items));
+print(typeOf(LoadState));
+print(typeOf(loadState));
 print(isType(status, "string"));
 print(isType(x, "int"));
 print(isInstance(user, User));
@@ -324,6 +344,7 @@ print(importedStatus);
 print(importedText);
 print(firstItem);
 print(profile);
+print(loadState);
 print(box.getValue());
 print(BaseName.name);
 print(BaseName.toString());
@@ -394,6 +415,31 @@ Rules:
 - `fallthrough;` must be the final top-level statement in a `case`
 - `fallthrough;` cannot appear inside `if`, loops, `try`, or nested blocks
 - the final switch clause cannot use `fallthrough;`
+
+## Enums
+
+Enums are symbolic named constants with member access through `.`.
+
+```fast
+enum LoadState {
+  Idle,
+  Loading,
+  Done
+}
+
+val loadState: LoadState = LoadState.Idle;
+
+if (loadState == LoadState.Idle) {
+  print("idle");
+}
+```
+
+Rules:
+
+- enum members are accessed like `LoadState.Idle`
+- enum members compare with `==` and `!=`
+- enum values can be used in `switch`
+- `print(LoadState.Idle)` renders as `LoadState.Idle`
 
 ## Overloads
 
@@ -541,7 +587,7 @@ Then open a `.fast` file in the extension development window.
 - function return values must match the declared return type
 - functions that do not return a value use `void`, like `function name(): void { ... }`
 - named functions expose implicit `name` and `toString()`, like `logGenericText.name` and `logGenericText.toString()`
-- `typeOf(value)` returns runtime categories like `"string"`, `"int"`, `"function"`, `"class"`, `"object"`, `"array"`, and `"tuple"`
+- `typeOf(value)` returns runtime categories like `"string"`, `"int"`, `"function"`, `"class"`, `"enum"`, `"object"`, `"array"`, and `"tuple"`
 - `isType(value, "string")` compares the runtime category returned by `typeOf`
 - `isInstance(value, ClassName)` checks whether an object instance belongs to a class or one of its base classes
 - `throw value;` requires a value whose class extends `Error`

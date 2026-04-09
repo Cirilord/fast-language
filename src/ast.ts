@@ -9,6 +9,7 @@ export type Statement =
   | ClassDeclaration
   | ContinueStatement
   | DoWhileStatement
+  | EnumDeclaration
   | FallthroughStatement
   | IfStatement
   | ThrowStatement
@@ -92,7 +93,13 @@ export type ThrowStatement = {
   value: Expression;
 };
 
-export type ExportableDeclaration = ClassDeclaration | FunctionDeclaration | VariableDeclaration;
+export type ExportableDeclaration = ClassDeclaration | EnumDeclaration | FunctionDeclaration | VariableDeclaration;
+
+export type EnumDeclaration = {
+  identifier: Identifier;
+  kind: 'EnumDeclaration';
+  members: Identifier[];
+};
 
 export type ExportDeclaration = {
   declaration?: ExportableDeclaration;

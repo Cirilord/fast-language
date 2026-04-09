@@ -16,6 +16,7 @@ export enum TokenType {
   Dot = 'DOT',
   Ellipsis = 'ELLIPSIS',
   Else = 'ELSE',
+  Enum = 'ENUM',
   EOF = 'EOF',
   EqualEqual = 'EQUAL_EQUAL',
   Equals = 'EQUALS',

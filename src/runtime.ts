@@ -11,6 +11,7 @@ import type {
   ClassProperty,
   ConditionalExpression,
   DoWhileStatement,
+  EnumDeclaration,
   ExceptClause,
   ExportDeclaration,
   Expression,
@@ -63,6 +64,19 @@ export type NativeFunctionValue = {
   call: (args: RuntimeValue[]) => RuntimeValue;
   name: string;
   type: 'native-function';
+};
+
+export type EnumValue = {
+  declaration: EnumDeclaration;
+  members: Map<string, EnumMemberValue>;
+  name: string;
+  type: 'enum';
+};
+
+export type EnumMemberValue = {
+  enumValue: EnumValue;
+  name: string;
+  type: 'enum-member';
 };
 
 export type ClassValue = {
@@ -134,6 +148,8 @@ export type RuntimeValue =
   | BoundMethodValue
   | BooleanValue
   | ClassValue
+  | EnumMemberValue
+  | EnumValue
   | InstanceValue
   | NativeFunctionValue
   | NullValue
@@ -194,6 +210,10 @@ function areRuntimeValuesEqual(left: RuntimeValue, right: RuntimeValue): boolean
     case 'boolean':
       return right.type === 'boolean' && left.value === right.value;
     case 'class':
+      return left === right;
+    case 'enum':
+      return left === right;
+    case 'enum-member':
       return left === right;
     case 'instance':
       return left === right;
@@ -764,6 +784,25 @@ export class Interpreter {
     return classValue;
   }
 
+  private createEnumValue(statement: EnumDeclaration): EnumValue {
+    const enumValue: EnumValue = {
+      declaration: statement,
+      members: new Map<string, EnumMemberValue>(),
+      name: statement.identifier.name,
+      type: 'enum',
+    };
+
+    for (const member of statement.members) {
+      enumValue.members.set(member.name, {
+        enumValue,
+        name: member.name,
+        type: 'enum-member',
+      });
+    }
+
+    return enumValue;
+  }
+
   private evaluateArrayLiteral(expression: ArrayLiteral): RuntimeValue {
     return {
       elements: expression.elements.map((element) => this.evaluateExpression(element)),
@@ -1131,6 +1170,16 @@ export class Interpreter {
       throw createReferenceError(`Static property '${propertyName}' is not defined`);
     }
 
+    if (object.type === 'enum') {
+      const member = object.members.get(propertyName);
+
+      if (member !== undefined) {
+        return member;
+      }
+
+      throw createReferenceError(`Enum member '${propertyName}' is not defined`);
+    }
+
     if (object.type === 'super') {
       const method = findInstanceMethod(object.superClass, propertyName);
 
@@ -1259,6 +1308,11 @@ export class Interpreter {
   private executeClassDeclaration(statement: ClassDeclaration): RuntimeValue {
     const classValue = this.createClassValue(statement);
     return this.scope.define(statement.identifier.name, classValue, false);
+  }
+
+  private executeEnumDeclaration(statement: EnumDeclaration): RuntimeValue {
+    const enumValue = this.createEnumValue(statement);
+    return this.scope.define(statement.identifier.name, enumValue, false);
   }
 
   private executeContinueStatement(): RuntimeValue {
@@ -1463,6 +1517,8 @@ export class Interpreter {
         return this.executeContinueStatement();
       case 'DoWhileStatement':
         return this.executeDoWhileStatement(statement);
+      case 'EnumDeclaration':
+        return this.executeEnumDeclaration(statement);
       case 'FallthroughStatement':
         return this.executeFallthroughStatement();
       case 'ThrowStatement':
@@ -1731,6 +1787,10 @@ export class Interpreter {
         return 'function';
       case 'class':
         return 'class';
+      case 'enum':
+        return 'enum';
+      case 'enum-member':
+        return 'enum';
       case 'function':
         return 'function';
       case 'instance':
@@ -1768,6 +1828,14 @@ export class Interpreter {
         : 'class';
 
     return `${declarationKind} ${classValue.name} { ... }`;
+  }
+
+  private renderEnumValue(enumValue: EnumValue): string {
+    return `enum ${enumValue.name} { ... }`;
+  }
+
+  private renderEnumMemberValue(enumMemberValue: EnumMemberValue): string {
+    return `${enumMemberValue.enumValue.name}.${enumMemberValue.name}`;
   }
 
   private renderInstanceValue(instance: InstanceValue): string {
@@ -1844,6 +1912,10 @@ export class Interpreter {
         return String(value.value);
       case 'class':
         return this.renderClassValue(value);
+      case 'enum':
+        return this.renderEnumValue(value);
+      case 'enum-member':
+        return this.renderEnumMemberValue(value);
       case 'instance':
         return this.renderInstanceValue(value);
       case 'native-function':

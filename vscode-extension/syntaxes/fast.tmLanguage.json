@@ -69,7 +69,7 @@
           }
         },
         {
-          "match": "\\b(class)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "match": "\\b(class|enum)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": {
               "name": "storage.type.class.ts"
@@ -220,7 +220,7 @@
         },
         {
           "name": "storage.type.class.ts",
-          "match": "\\bclass\\b"
+          "match": "\\b(?:class|enum)\\b"
         },
         {
           "name": "variable.language.ts",

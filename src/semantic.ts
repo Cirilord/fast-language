@@ -11,6 +11,7 @@ import type {
   ClassProperty,
   ConditionalExpression,
   DoWhileStatement,
+  EnumDeclaration,
   ExceptClause,
   ExportDeclaration,
   Expression,
@@ -58,6 +59,7 @@ export type SemanticSymbol = {
   arity?: number;
   callable: boolean;
   classDeclaration?: ClassDeclaration;
+  enumDeclaration?: EnumDeclaration;
   minArity?: number;
   mutable: boolean;
   name: string;
@@ -76,6 +78,11 @@ export type SemanticImportResolver = (source: string) => SemanticModuleExports;
 type ResolvedClassMember = {
   member: ClassMethod | ClassProperty;
   owner: ClassDeclaration;
+};
+
+type ResolvedEnumMember = {
+  member: Identifier;
+  owner: EnumDeclaration;
 };
 
 type TypeGuard = {
@@ -496,6 +503,10 @@ class SemanticScope {
 
   public lookupCurrent(name: string): SemanticSymbol | undefined {
     return this.symbols.get(name);
+  }
+
+  public lookupOptional(name: string): SemanticSymbol | undefined {
+    return this.resolve(name);
   }
 
   public replace(symbol: SemanticSymbol): void {
@@ -1273,6 +1284,39 @@ export class SemanticAnalyzer {
     }
   }
 
+  private analyzeEnumDeclaration(statement: EnumDeclaration): void {
+    if (statement.members.length === 0) {
+      throw createTypeError(
+        `Enum '${statement.identifier.name}' must declare at least one member`,
+        statement.identifier.location
+      );
+    }
+
+    const seenMembers = new Set<string>();
+
+    for (const member of statement.members) {
+      if (seenMembers.has(member.name)) {
+        throw createTypeError(
+          `Enum '${statement.identifier.name}' already defines member '${member.name}'`,
+          member.location
+        );
+      }
+
+      seenMembers.add(member.name);
+    }
+
+    this.scope.define(
+      {
+        callable: false,
+        enumDeclaration: statement,
+        mutable: false,
+        name: statement.identifier.name,
+        type: 'enum',
+      },
+      statement.identifier.location
+    );
+  }
+
   private analyzeExportDeclaration(statement: ExportDeclaration): void {
     if (statement.declaration !== undefined) {
       this.analyzeStatement(statement.declaration);
@@ -1682,6 +1726,10 @@ export class SemanticAnalyzer {
         type: exportedSymbol.type,
       };
 
+      if (exportedSymbol.enumDeclaration !== undefined) {
+        importedSymbol.enumDeclaration = exportedSymbol.enumDeclaration;
+      }
+
       if (exportedSymbol.arity !== undefined) {
         importedSymbol.arity = exportedSymbol.arity;
       }
@@ -1730,6 +1778,16 @@ export class SemanticAnalyzer {
   }
 
   private analyzeMemberExpression(expression: MemberExpression): SemanticType {
+    if (expression.object.kind === 'Identifier') {
+      const objectSymbol = this.scope.lookup(expression.object.name, expression.object.location);
+
+      if (objectSymbol.enumDeclaration !== undefined) {
+        const member = this.resolveEnumMemberExpression(expression);
+
+        return member.owner.identifier.name;
+      }
+    }
+
     const objectType = this.analyzeExpression(expression.object);
 
     if (expression.property.name === 'constructor' && objectType !== 'unknown') {
@@ -1871,6 +1929,9 @@ export class SemanticAnalyzer {
       case 'DoWhileStatement':
         this.analyzeDoWhileStatement(statement);
         return;
+      case 'EnumDeclaration':
+        this.analyzeEnumDeclaration(statement);
+        return;
       case 'FallthroughStatement':
         this.analyzeFallthroughStatement();
         return;
@@ -1930,7 +1991,7 @@ export class SemanticAnalyzer {
   private analyzeSwitchCase(caseClause: SwitchCase, discriminantType: SemanticType, canFallthrough: boolean): void {
     const caseType = this.analyzeExpression(caseClause.test);
 
-    if (!isSwitchComparableType(caseType) && caseType !== 'unknown') {
+    if (!this.isSwitchComparableType(caseType) && caseType !== 'unknown') {
       throw createTypeError(`Switch case value must be a string, number, boolean, null, or tuple, got '${caseType}'`);
     }
 
@@ -1976,7 +2037,7 @@ export class SemanticAnalyzer {
     const discriminantType = this.analyzeExpression(statement.discriminant);
     const hasDefault = statement.defaultBody !== undefined;
 
-    if (!isSwitchComparableType(discriminantType) && discriminantType !== 'unknown') {
+    if (!this.isSwitchComparableType(discriminantType) && discriminantType !== 'unknown') {
       throw createTypeError(
         `Switch value must be a string, number, boolean, null, or tuple, got '${discriminantType}'`
       );
@@ -2871,6 +2932,19 @@ export class SemanticAnalyzer {
     return this.isSameOrSubclass(this.getClassDeclaration(candidate.baseClass), base);
   }
 
+  private isEnumType(type: SemanticType): boolean {
+    if (typeof type !== 'string') {
+      return false;
+    }
+
+    const symbol = this.scope.lookupOptional(type);
+    return symbol?.enumDeclaration !== undefined;
+  }
+
+  private isSwitchComparableType(type: SemanticType): boolean {
+    return isSwitchComparableType(type) || this.isEnumType(type);
+  }
+
   private requireCurrentClass(keyword: 'super' | 'this'): ClassDeclaration {
     if (this.currentClass === undefined) {
       throw createTypeError(`'${keyword}' can only be used inside classes`);
@@ -3000,6 +3074,33 @@ export class SemanticAnalyzer {
 
     this.ensureMemberIsAccessible(member, expression.property.location);
     return member;
+  }
+
+  private resolveEnumMemberExpression(expression: MemberExpression): ResolvedEnumMember {
+    if (expression.object.kind !== 'Identifier') {
+      throw createTypeError('Enum member access requires an enum identifier', expression.property.location);
+    }
+
+    const objectSymbol = this.scope.lookup(expression.object.name, expression.object.location);
+    const enumDeclaration = objectSymbol.enumDeclaration;
+
+    if (enumDeclaration === undefined) {
+      throw createTypeError(`Binding '${expression.object.name}' is not an enum`, expression.object.location);
+    }
+
+    const member = enumDeclaration.members.find((enumMember) => enumMember.name === expression.property.name);
+
+    if (member === undefined) {
+      throw createReferenceError(
+        `Enum member '${expression.property.name}' is not defined`,
+        expression.property.location
+      );
+    }
+
+    return {
+      member,
+      owner: enumDeclaration,
+    };
   }
 
   private resolveOverloadSignature(
