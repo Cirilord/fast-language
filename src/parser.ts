@@ -23,6 +23,7 @@ import type {
   FunctionDeclaration,
   FunctionReturnType,
   Identifier,
+  IndexExpression,
   IfStatement,
   ImportDeclaration,
   MemberExpression,
@@ -258,6 +259,16 @@ export class Parser {
           object: expression,
           property: this.createIdentifier(property),
         } satisfies MemberExpression;
+        continue;
+      }
+
+      if (this.match(TokenType.LeftBracket)) {
+        expression = {
+          index: this.parseExpression(),
+          kind: 'IndexExpression',
+          object: expression,
+        } satisfies IndexExpression;
+        this.consume(TokenType.RightBracket, "Expected ']' after index expression.");
         continue;
       }
 

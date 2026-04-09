@@ -18,6 +18,7 @@ import type {
   FunctionDeclaration,
   FunctionReturnType,
   Identifier,
+  IndexExpression,
   IfStatement,
   ImportDeclaration,
   MemberExpression,
@@ -956,6 +957,8 @@ export class Interpreter {
         return this.evaluateConditionalExpression(expression);
       case 'Identifier':
         return this.evaluateIdentifier(expression);
+      case 'IndexExpression':
+        return this.evaluateIndexExpression(expression);
       case 'MemberExpression':
         return this.evaluateMemberExpression(expression);
       case 'NewExpression':
@@ -979,6 +982,27 @@ export class Interpreter {
 
   private evaluateIdentifier(expression: Identifier): RuntimeValue {
     return this.scope.lookup(expression.name);
+  }
+
+  private evaluateIndexExpression(expression: IndexExpression): RuntimeValue {
+    const object = this.evaluateExpression(expression.object);
+    const index = this.evaluateExpression(expression.index);
+
+    if (index.type !== 'number' || index.numberType !== 'int') {
+      throw createTypeError('Array index must be an int');
+    }
+
+    if (object.type !== 'array') {
+      throw createTypeError(`Index access requires an array, got '${object.type}'`);
+    }
+
+    const value = object.elements[index.value];
+
+    if (value === undefined) {
+      throw createReferenceError(`Array index '${index.value}' is out of bounds`);
+    }
+
+    return value;
   }
 
   private evaluateMemberExpression(expression: MemberExpression): RuntimeValue {

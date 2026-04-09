@@ -41,6 +41,7 @@ Right now the project is implemented in TypeScript and already supports:
 - multiline strings with `` ` ``
 - line comments with `//`
 - array literals with `[value, value]`
+- array index access like `items[0]`
 - `for ... of` loops with optional index binding
 - `if`, `else if`, and `else` with boolean conditions
 - `break` and `continue` inside loops
@@ -59,6 +60,7 @@ import { importedText, logImportedText } from "./file1";
 
 // Number types are declared on variables.
 val items: string[] = ["first", "second", "third"];
+val firstItem: string = items[0];
 val profile: (string, int, double) = ("Cirilo", 30, 1.80);
 val result: int = (10 + 5) * 2;
 val directNegative: int = -10;
@@ -289,6 +291,7 @@ print(isInstance(user, User));
 print(isInstance(user, BaseName));
 print(importedStatus);
 print(importedText);
+print(firstItem);
 print(profile);
 print(box.getValue());
 print(BaseName.name);
@@ -465,6 +468,7 @@ Then open a `.fast` file in the extension development window.
 - line comments start with `//` and run until the end of the line
 - arrays use `[value, value]`
 - array types use `T[]`, like `string[]`
+- array index access uses `array[index]`, and the index must be an `int`
 - tuple types use `(T1, T2, ...)` and tuple literals use `(value1, value2, ...)`
 - `for` loops use `for (var element of array) { ... }`
 - `for` loops can access index with `for (var element, index of array) { ... }`

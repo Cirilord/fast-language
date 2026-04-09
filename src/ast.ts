@@ -202,6 +202,7 @@ export type Expression =
   | CallExpression
   | ConditionalExpression
   | Identifier
+  | IndexExpression
   | MemberExpression
   | NewExpression
   | NullLiteral
@@ -229,6 +230,12 @@ export type ConditionalExpression = {
   consequent: Expression;
   kind: 'ConditionalExpression';
   test: Expression;
+};
+
+export type IndexExpression = {
+  index: Expression;
+  kind: 'IndexExpression';
+  object: Expression;
 };
 
 export type MemberExpression = {

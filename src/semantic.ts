@@ -19,6 +19,7 @@ import type {
   FunctionDeclaration,
   FunctionReturnType,
   Identifier,
+  IndexExpression,
   IfStatement,
   ImportDeclaration,
   MemberExpression,
@@ -1262,6 +1263,8 @@ export class SemanticAnalyzer {
         return this.analyzeConditionalExpression(expression);
       case 'Identifier':
         return this.analyzeIdentifier(expression);
+      case 'IndexExpression':
+        return this.analyzeIndexExpression(expression);
       case 'MemberExpression':
         return this.analyzeMemberExpression(expression);
       case 'NewExpression':
@@ -1662,6 +1665,25 @@ export class SemanticAnalyzer {
 
       this.scope.define(importedSymbol, identifier.location);
     }
+  }
+
+  private analyzeIndexExpression(expression: IndexExpression): SemanticType {
+    const objectType = this.analyzeExpression(expression.object);
+    const indexType = this.analyzeExpression(expression.index);
+
+    if (indexType !== 'int' && indexType !== 'unknown') {
+      throw createTypeError(`Array index must be an int, got '${indexType}'`);
+    }
+
+    if (objectType === 'unknown') {
+      return 'unknown';
+    }
+
+    if (objectType !== 'array' && !isArrayType(objectType)) {
+      throw createTypeError(`Index access requires an array, got '${objectType}'`);
+    }
+
+    return objectType === 'array' ? 'unknown' : getArrayElementType(objectType);
   }
 
   private analyzeMemberExpression(expression: MemberExpression): SemanticType {
