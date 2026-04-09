@@ -36,6 +36,7 @@ Right now the project is implemented in TypeScript and already supports:
 - named imports with `import { name } from "./file";`
 - combined imports with `import File, { name } from "./file";`
 - builtin namespace modules like `import Math from "math";`
+- builtin namespace modules like `import Array from "array";`
 - named exports with `export var`, `export val`, `export function`, and `export name;`
 - symbolic enums like `enum Status { Pending, Done }`
 - typed numeric declarations like `var count: int = 10;`
@@ -66,11 +67,14 @@ Right now the project is implemented in TypeScript and already supports:
 `main.fast`
 
 ```fast
+import Array from "array";
 import Math from "math";
 import File1, { importedText, logImportedText } from "./file1";
 
 // Number types are declared on variables.
 val items: string[] = ["first", "second", "third"];
+val itemsCopy: string[] = Array.concat(items, []);
+var clearItems: string[] = Array.concat(items, []);
 val firstItem: string = items[0];
 val profile: (string, int, double) = ("Cirilo", 30, 1.80);
 val result: int = (10 + 5) * 2;
@@ -98,6 +102,12 @@ val mathAbs: int = Math.abs(-10);
 val mathMax: double = Math.max(10, 20.0, 15);
 val mathPow: double = Math.pow(2, 3);
 val mathPrecise: double = Math.sumPrecise([0.1, 0.2, 0.3]);
+val arrayLength: int = Array.length(itemsCopy);
+val arrayHasSecond: boolean = Array.includes(itemsCopy, "second");
+val arrayIndex: int = Array.indexOf(itemsCopy, "third");
+val arraySlice: string[] = Array.slice(itemsCopy, 0, 2);
+val arrayAt: string = Array.at(itemsCopy, -1);
+val joinedItems: string = Array.join(itemsCopy, " | ");
 
 enum LoadState {
   Idle,
@@ -261,6 +271,13 @@ shouldPrint &&= 10 == 10;
 shouldFallback ||= 10 == 10;
 nullableText ??= "Fallback text";
 items[0] = "updated first";
+Array.push(itemsCopy, "fourth");
+Array.unshift(itemsCopy, "zero");
+val shiftedItem: string = Array.shift(itemsCopy);
+val poppedItem: string = Array.pop(itemsCopy);
+Array.fill(itemsCopy, "filled", 1, 2);
+Array.reverse(itemsCopy);
+Array.clear(clearItems);
 
 for (var item, index of items) {
   print(index);

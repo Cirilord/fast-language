@@ -1,9 +1,25 @@
 import type { NumberLiteralType, TypeParameter } from './ast';
-import { createTypeError } from './errors';
+import { createReferenceError, createTypeError } from './errors';
 import type { RuntimeModuleExports, RuntimeValue } from './runtime';
 import type { CallableSignature, SemanticModuleExports, SemanticSymbol } from './semantic';
 
 const EMPTY_TYPE_PARAMETERS: TypeParameter[] = [];
+
+function createTypeParameter(name: string): TypeParameter {
+  return {
+    identifier: {
+      kind: 'Identifier',
+      location: {
+        column: 1,
+        line: 1,
+      },
+      name,
+    },
+    kind: 'TypeParameter',
+  };
+}
+
+const ARRAY_TYPE_PARAMETERS: TypeParameter[] = [createTypeParameter('T')];
 
 function createNumberValue(value: number, numberType: NumberLiteralType = 'double'): RuntimeValue {
   return {
@@ -27,7 +43,8 @@ function createSemanticFunction(
   parameterTypes: string[],
   minArity = parameterTypes.length,
   restParameterType?: string,
-  overloadSignatures?: CallableSignature[]
+  overloadSignatures?: CallableSignature[],
+  typeParameters: TypeParameter[] = EMPTY_TYPE_PARAMETERS
 ): SemanticSymbol {
   const symbol: SemanticSymbol = {
     callable: true,
@@ -37,7 +54,7 @@ function createSemanticFunction(
     parameterTypes,
     returnType,
     type: 'function',
-    typeParameters: EMPTY_TYPE_PARAMETERS,
+    typeParameters,
   };
 
   if (restParameterType !== undefined) {
@@ -94,6 +111,105 @@ function expectNumericArrayArgument(value: RuntimeValue | undefined, functionNam
   return value.elements.map((element, elementIndex) =>
     expectNumberArgument(element, functionName, `${index}.${elementIndex + 1}`)
   );
+}
+
+function expectArrayArgument(value: RuntimeValue | undefined, functionName: string, index: number): RuntimeValue[] {
+  if (value?.type !== 'array') {
+    throw createTypeError(`'${functionName}' expects array at argument ${index}`);
+  }
+
+  return value.elements;
+}
+
+function getArrayElementAt(elements: RuntimeValue[], index: number, functionName: string): RuntimeValue {
+  const value = elements[index];
+
+  if (value === undefined) {
+    throw createReferenceError(`'${functionName}' index '${index}' is out of bounds`);
+  }
+
+  return value;
+}
+
+function runtimeValueToBuiltinString(value: RuntimeValue): string {
+  switch (value.type) {
+    case 'array':
+      return `[${value.elements.map((element) => runtimeValueToBuiltinString(element)).join(', ')}]`;
+    case 'boolean':
+      return String(value.value);
+    case 'bound-method':
+      return '<bound method>';
+    case 'class':
+      return `class ${value.name} { ... }`;
+    case 'enum':
+      return `enum ${value.name} { ... }`;
+    case 'enum-member':
+      return `${value.enumValue.name}.${value.name}`;
+    case 'function':
+      return value.name === '' ? 'function(...): ... { ... }' : `function ${value.name}(...) { ... }`;
+    case 'instance':
+      return `${value.classValue.name} { ... }`;
+    case 'namespace':
+      return `<namespace ${value.name}>`;
+    case 'native-function':
+      return `<native function ${value.name}>`;
+    case 'null':
+      return 'null';
+    case 'number':
+      return String(value.value);
+    case 'string':
+      return value.value;
+    case 'super':
+      return `${value.superClass.name} { ... }`;
+    case 'tuple':
+      return `(${value.elements.map((element) => runtimeValueToBuiltinString(element)).join(', ')})`;
+  }
+}
+
+function areBuiltinRuntimeValuesEqual(left: RuntimeValue, right: RuntimeValue): boolean {
+  if (left.type !== right.type) {
+    return false;
+  }
+
+  switch (left.type) {
+    case 'array':
+      return left === right;
+    case 'boolean':
+      return right.type === 'boolean' && left.value === right.value;
+    case 'bound-method':
+      return left === right;
+    case 'class':
+      return left === right;
+    case 'enum':
+      return left === right;
+    case 'enum-member':
+      return left === right;
+    case 'function':
+      return left === right;
+    case 'instance':
+      return left === right;
+    case 'namespace':
+      return left === right;
+    case 'native-function':
+      return left === right;
+    case 'null':
+      return true;
+    case 'number':
+      return right.type === 'number' && left.value === right.value;
+    case 'string':
+      return right.type === 'string' && left.value === right.value;
+    case 'super':
+      return left === right;
+    case 'tuple':
+      return (
+        right.type === 'tuple' &&
+        left.elements.length === right.elements.length &&
+        left.elements.every((element, index) => {
+          const rightElement = right.elements[index];
+          return rightElement !== undefined && areBuiltinRuntimeValuesEqual(element, rightElement);
+        })
+      );
+  }
 }
 
 function roundToFloat16(value: number): number {
@@ -413,13 +529,261 @@ function createMathSemanticExports(): SemanticModuleExports {
   return exports;
 }
 
+function createArrayRuntimeExports(): RuntimeModuleExports {
+  const exports = new Map<string, RuntimeValue>();
+
+  exports.set('length', {
+    call: ([array]): RuntimeValue => createNumberValue(expectArrayArgument(array, 'Array.length', 1).length, 'int'),
+    name: 'Array.length',
+    type: 'native-function',
+  });
+
+  exports.set('push', {
+    call: ([array, value]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.push', 1);
+
+      if (value === undefined) {
+        throw createTypeError("'Array.push' expects value at argument 2");
+      }
+
+      elements.push(value);
+      return createNumberValue(elements.length, 'int');
+    },
+    name: 'Array.push',
+    type: 'native-function',
+  });
+
+  exports.set('pop', {
+    call: ([array]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.pop', 1);
+      const value = elements.pop();
+
+      if (value === undefined) {
+        throw createReferenceError("'Array.pop' cannot remove from an empty array");
+      }
+
+      return value;
+    },
+    name: 'Array.pop',
+    type: 'native-function',
+  });
+
+  exports.set('slice', {
+    call: ([array, start, end]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.slice', 1);
+      const startIndex = Math.trunc(expectNumberArgument(start, 'Array.slice', 2));
+      const endIndex = end === undefined ? undefined : Math.trunc(expectNumberArgument(end, 'Array.slice', 3));
+
+      return {
+        elements: elements.slice(startIndex, endIndex),
+        type: 'array',
+      };
+    },
+    name: 'Array.slice',
+    type: 'native-function',
+  });
+
+  exports.set('includes', {
+    call: ([array, value]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.includes', 1);
+      return {
+        type: 'boolean',
+        value: value !== undefined && elements.some((element) => areBuiltinRuntimeValuesEqual(element, value)),
+      };
+    },
+    name: 'Array.includes',
+    type: 'native-function',
+  });
+
+  exports.set('indexOf', {
+    call: ([array, value]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.indexOf', 1);
+      return createNumberValue(
+        value === undefined ? -1 : elements.findIndex((element) => areBuiltinRuntimeValuesEqual(element, value)),
+        'int'
+      );
+    },
+    name: 'Array.indexOf',
+    type: 'native-function',
+  });
+
+  exports.set('clear', {
+    call: ([array]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.clear', 1);
+      elements.length = 0;
+      return { type: 'null', value: null };
+    },
+    name: 'Array.clear',
+    type: 'native-function',
+  });
+
+  exports.set('reverse', {
+    call: ([array]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.reverse', 1);
+      elements.reverse();
+      return array ?? { elements, type: 'array' };
+    },
+    name: 'Array.reverse',
+    type: 'native-function',
+  });
+
+  exports.set('join', {
+    call: ([array, separator]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.join', 1);
+
+      if (separator !== undefined && separator.type !== 'string') {
+        throw createTypeError("'Array.join' expects string at argument 2");
+      }
+
+      return {
+        type: 'string',
+        value: elements.map((element) => runtimeValueToBuiltinString(element)).join(separator?.value ?? ','),
+      };
+    },
+    name: 'Array.join',
+    type: 'native-function',
+  });
+
+  exports.set('at', {
+    call: ([array, index]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.at', 1);
+      const requestedIndex = Math.trunc(expectNumberArgument(index, 'Array.at', 2));
+      const normalizedIndex = requestedIndex >= 0 ? requestedIndex : elements.length + requestedIndex;
+
+      return getArrayElementAt(elements, normalizedIndex, 'Array.at');
+    },
+    name: 'Array.at',
+    type: 'native-function',
+  });
+
+  exports.set('shift', {
+    call: ([array]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.shift', 1);
+      const value = elements.shift();
+
+      if (value === undefined) {
+        throw createReferenceError("'Array.shift' cannot remove from an empty array");
+      }
+
+      return value;
+    },
+    name: 'Array.shift',
+    type: 'native-function',
+  });
+
+  exports.set('unshift', {
+    call: ([array, ...values]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.unshift', 1);
+      elements.unshift(...values);
+      return createNumberValue(elements.length, 'int');
+    },
+    name: 'Array.unshift',
+    type: 'native-function',
+  });
+
+  exports.set('concat', {
+    call: ([left, right]): RuntimeValue => ({
+      elements: [...expectArrayArgument(left, 'Array.concat', 1), ...expectArrayArgument(right, 'Array.concat', 2)],
+      type: 'array',
+    }),
+    name: 'Array.concat',
+    type: 'native-function',
+  });
+
+  exports.set('fill', {
+    call: ([array, value, start, end]): RuntimeValue => {
+      const elements = expectArrayArgument(array, 'Array.fill', 1);
+
+      if (value === undefined) {
+        throw createTypeError("'Array.fill' expects value at argument 2");
+      }
+
+      const startIndex = start === undefined ? 0 : Math.trunc(expectNumberArgument(start, 'Array.fill', 3));
+      const endIndex = end === undefined ? elements.length : Math.trunc(expectNumberArgument(end, 'Array.fill', 4));
+
+      elements.fill(value, startIndex, endIndex);
+      return array ?? { elements, type: 'array' };
+    },
+    name: 'Array.fill',
+    type: 'native-function',
+  });
+
+  return exports;
+}
+
+function createArraySemanticExports(): SemanticModuleExports {
+  const exports = new Map<string, SemanticSymbol>();
+
+  exports.set('length', {
+    ...createSemanticFunction('int', ['T[]'], 1, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'length',
+  });
+  exports.set('push', {
+    ...createSemanticFunction('int', ['T[]', 'T'], 2, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'push',
+  });
+  exports.set('pop', {
+    ...createSemanticFunction('T', ['T[]'], 1, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'pop',
+  });
+  exports.set('slice', {
+    ...createSemanticFunction('T[]', ['T[]', 'int', 'int'], 2, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'slice',
+  });
+  exports.set('includes', {
+    ...createSemanticFunction('boolean', ['T[]', 'T'], 2, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'includes',
+  });
+  exports.set('indexOf', {
+    ...createSemanticFunction('int', ['T[]', 'T'], 2, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'indexOf',
+  });
+  exports.set('clear', {
+    ...createSemanticFunction('void', ['T[]'], 1, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'clear',
+  });
+  exports.set('reverse', {
+    ...createSemanticFunction('T[]', ['T[]'], 1, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'reverse',
+  });
+  exports.set('join', {
+    ...createSemanticFunction('string', ['T[]', 'string'], 1, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'join',
+  });
+  exports.set('at', {
+    ...createSemanticFunction('T', ['T[]', 'int'], 2, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'at',
+  });
+  exports.set('shift', {
+    ...createSemanticFunction('T', ['T[]'], 1, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'shift',
+  });
+  exports.set('unshift', {
+    ...createSemanticFunction('int', ['T[]', 'T[]'], 1, 'T[]', undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'unshift',
+  });
+  exports.set('concat', {
+    ...createSemanticFunction('T[]', ['T[]', 'T[]'], 2, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'concat',
+  });
+  exports.set('fill', {
+    ...createSemanticFunction('T[]', ['T[]', 'T', 'int', 'int'], 2, undefined, undefined, ARRAY_TYPE_PARAMETERS),
+    name: 'fill',
+  });
+
+  return exports;
+}
+
 const BUILTIN_MODULES = new Map<
   string,
   {
     runtimeExports: RuntimeModuleExports;
     semanticExports: SemanticModuleExports;
   }
->([['math', { runtimeExports: createMathRuntimeExports(), semanticExports: createMathSemanticExports() }]]);
+>([
+  ['array', { runtimeExports: createArrayRuntimeExports(), semanticExports: createArraySemanticExports() }],
+  ['math', { runtimeExports: createMathRuntimeExports(), semanticExports: createMathSemanticExports() }],
+]);
 
 export function getBuiltinModuleRuntimeExports(source: string): RuntimeModuleExports | undefined {
   return BUILTIN_MODULES.get(source)?.runtimeExports;

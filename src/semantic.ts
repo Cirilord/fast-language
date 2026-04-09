@@ -977,6 +977,22 @@ export class SemanticAnalyzer {
           }
 
           if (exportedSymbol.parameterTypes !== undefined) {
+            if (exportedSymbol.typeParameters !== undefined && exportedSymbol.typeParameters.length > 0) {
+              const typeArguments = this.analyzeGenericArguments(
+                expression.arguments,
+                exportedSymbol.parameterTypes,
+                exportedSymbol.typeParameters,
+                expression.typeArguments,
+                expression.callee.property.location,
+                expression.callee.property.name,
+                exportedSymbol.restParameterType
+              ).returnTypeArguments;
+
+              return exportedSymbol.returnType === undefined
+                ? 'unknown'
+                : instantiateType(exportedSymbol.returnType, typeArguments);
+            }
+
             this.analyzeArguments(
               expression.arguments,
               exportedSymbol.parameterTypes,
