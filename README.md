@@ -15,6 +15,7 @@ Right now the project is implemented in TypeScript and already supports:
 - logical assignment operators with `&&=`, `||=`, and `??=`
 - function declarations with typed parameters and optional default values
 - rest parameters with typed arrays like `...items: string[]`
+- overloaded functions and methods with signature declarations and a single `unknown` implementation
 - generic functions and classes with type parameters like `<T, K = string>`
 - `void` functions with `function name(): void { ... }`
 - named functions expose implicit `name` and `toString()`, and `print(functionName)` uses the function string representation
@@ -101,6 +102,14 @@ function logGenericText<T, K = string>(importedText: K, output: T): T {
   return output;
 }
 
+function logValue(value: string): void;
+function logValue(value: int): void;
+function logValue(value: unknown): void {
+  print(isType(value, "string") ? "function string" : "function int");
+  print(value);
+  return;
+}
+
 abstract virtual class Printable {
   public printName(): void;
 }
@@ -153,6 +162,16 @@ class Box<T, K = string> {
   }
 }
 
+class Logger {
+  public log(value: string): void;
+  public log(value: int): void;
+  public log(value: unknown): void {
+    print(isType(value, "string") ? "method string" : "method int");
+    print(value);
+    return;
+  }
+}
+
 class AppError extends Error {
   public constructor(message: string) {
     super(message);
@@ -163,6 +182,7 @@ val computedStatus: string = getStatus();
 val genericStatus: string = identity<string>(status);
 val importedStatus: string = logGenericText<string>("Imported generic text", status);
 var box: Box<string, string> = new Box<string>(status, "status-box");
+var logger: Logger = new Logger();
 var user: User = new User();
 
 x += 5;
@@ -230,6 +250,10 @@ user.printName();
 User.showLabel();
 logStatus();
 logAll("values", "alpha", "beta", "gamma");
+logValue("global overload");
+logValue(42);
+logger.log("class overload");
+logger.log(7);
 logImportedText();
 
 try {
@@ -258,6 +282,32 @@ function logImportedText(): void {
 export importedText;
 export logImportedText;
 ```
+
+## Overloads
+
+Overloads are supported for both top-level functions and class methods.
+
+```fast
+function log(value: string): void;
+function log(value: int): void;
+function log(value: unknown): void {
+  print(isType(value, "string") ? "string" : "int");
+  print(value);
+  return;
+}
+```
+
+Rules:
+
+- overload signatures are declarations without a body
+- exactly one implementation with a body must come after the signatures
+- overloads are available for global functions and class methods
+- all signatures in the same overload group must keep the same return type
+- method overloads must also keep the same access modifier and `static` modifier
+- the implementation must keep the same parameter count as the signatures
+- any parameter position that varies across signatures must use `unknown` in the implementation
+- `unknown` is reserved for overload implementations and cannot be used in normal bindings, properties, returns, or regular parameters
+- overload groups currently do not support default parameters or rest parameters
 
 ## Project Flow
 

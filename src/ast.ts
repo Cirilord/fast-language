@@ -62,7 +62,7 @@ export type ExportDeclaration = {
 };
 
 export type FunctionDeclaration = {
-  body: Statement[];
+  body?: Statement[];
   identifier: Identifier;
   kind: 'FunctionDeclaration';
   parameters: Parameter[];

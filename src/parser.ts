@@ -563,16 +563,20 @@ export class Parser {
     this.consume(TokenType.LeftParen, "Expected '(' after function name.");
     const parameters = this.parseParameters();
     this.consume(TokenType.Colon, "Expected ':' after function parameters.");
-    const returnType = this.parseFunctionReturnType();
-
-    return {
-      body: this.parseBlockStatement(),
+    const declaration: FunctionDeclaration = {
       identifier: this.createIdentifier(name),
       kind: 'FunctionDeclaration',
       parameters,
-      returnType,
+      returnType: this.parseFunctionReturnType(),
       typeParameters,
     };
+
+    if (this.match(TokenType.Semicolon)) {
+      return declaration;
+    }
+
+    declaration.body = this.parseBlockStatement();
+    return declaration;
   }
 
   private parseFunctionReturnType(): FunctionReturnType {

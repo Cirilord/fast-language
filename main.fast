@@ -55,6 +55,14 @@ function logGenericText<T, K = string>(importedText: K, output: T): T {
   return output;
 }
 
+function logValue(value: string): void;
+function logValue(value: int): void;
+function logValue(value: unknown): void {
+  print(isType(value, "string") ? "function string" : "function int");
+  print(value);
+  return;
+}
+
 abstract virtual class Printable {
   public printName(): void;
 }
@@ -107,6 +115,16 @@ class Box<T, K = string> {
   }
 }
 
+class Logger {
+  public log(value: string): void;
+  public log(value: int): void;
+  public log(value: unknown): void {
+    print(isType(value, "string") ? "method string" : "method int");
+    print(value);
+    return;
+  }
+}
+
 class AppError extends Error {
   public constructor(message: string) {
     super(message);
@@ -117,6 +135,7 @@ val computedStatus: string = getStatus();
 val genericStatus: string = identity<string>(status);
 val importedStatus: string = logGenericText<string>("Imported generic text", status);
 var box: Box<string, string> = new Box<string>(status, "status-box");
+var logger: Logger = new Logger();
 var user: User = new User();
 
 x += 5;
@@ -190,6 +209,10 @@ User.showLabel();
 logStatus();
 logStatusTwice();
 logAll("values", "alpha", "beta", "gamma");
+logValue("global overload");
+logValue(42);
+logger.log("class overload");
+logger.log(7);
 logStatus("state");
 logImportedText();
 

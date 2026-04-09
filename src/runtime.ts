@@ -1281,6 +1281,10 @@ export class Interpreter {
   }
 
   private executeFunctionDeclaration(statement: FunctionDeclaration): RuntimeValue {
+    if (statement.body === undefined) {
+      return { type: 'null', value: null };
+    }
+
     return this.scope.define(
       statement.identifier.name,
       {

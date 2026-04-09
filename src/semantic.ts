@@ -42,6 +42,14 @@ import { createReferenceError, createSyntaxError, createTypeError } from './erro
 
 export type SemanticType = 'function' | 'null' | 'void' | TypeName | 'unknown';
 
+type CallableSignature = {
+  minArity: number;
+  parameterTypes: TypeName[];
+  restParameterType?: TypeName;
+  returnType: SemanticType;
+  typeParameters: TypeParameter[];
+};
+
 export type SemanticSymbol = {
   arity?: number;
   callable: boolean;
@@ -49,6 +57,7 @@ export type SemanticSymbol = {
   minArity?: number;
   mutable: boolean;
   name: string;
+  overloadSignatures?: CallableSignature[];
   parameterTypes?: TypeName[];
   restParameterType?: TypeName;
   returnType?: SemanticType;
@@ -139,6 +148,23 @@ function parseAppliedGenericType(type: string): { args: string[]; baseName: stri
     args: splitTopLevel(argsContent),
     baseName,
   };
+}
+
+function containsUnknownType(type: string): boolean {
+  if (type === 'unknown') {
+    return true;
+  }
+
+  if (type.endsWith('[]')) {
+    return containsUnknownType(getArrayElementType(type));
+  }
+
+  if (isTupleType(type)) {
+    return splitTupleTypes(type).some((part) => containsUnknownType(part));
+  }
+
+  const appliedType = parseAppliedGenericType(type);
+  return appliedType?.args.some((arg) => containsUnknownType(arg)) ?? false;
 }
 
 function getArrayElementType(type: string): string {
@@ -382,6 +408,14 @@ class SemanticScope {
     }
 
     return symbol;
+  }
+
+  public lookupCurrent(name: string): SemanticSymbol | undefined {
+    return this.symbols.get(name);
+  }
+
+  public replace(symbol: SemanticSymbol): void {
+    this.symbols.set(symbol.name, symbol);
   }
 
   private resolve(name: string): SemanticSymbol | undefined {
@@ -683,11 +717,45 @@ export class SemanticAnalyzer {
       }
 
       const objectType = this.analyzeExpression(expression.callee.object);
+      const callTarget = this.getMethodCallTarget(
+        resolved.owner,
+        expression.callee.property.name,
+        resolved.member.static
+      );
       const typeArguments = this.resolveClassTypeArguments(
         resolved.owner,
         objectType,
         expression.callee.property.location
       );
+
+      if (callTarget !== undefined && callTarget.overloadSignatures.length > 0) {
+        const instantiatedSignatures = callTarget.overloadSignatures.map((signature) => {
+          const instantiatedSignature: CallableSignature = {
+            minArity: signature.minArity,
+            parameterTypes: signature.parameterTypes.map((parameterType) =>
+              instantiateType(parameterType, typeArguments)
+            ),
+            returnType: instantiateType(signature.returnType, typeArguments),
+            typeParameters: signature.typeParameters,
+          };
+
+          if (signature.restParameterType !== undefined) {
+            instantiatedSignature.restParameterType = instantiateType(signature.restParameterType, typeArguments);
+          }
+
+          return instantiatedSignature;
+        });
+        const resolvedOverload = this.resolveOverloadSignature(
+          expression.arguments,
+          expression.callee.property.name,
+          instantiatedSignatures,
+          expression.callee.property.location,
+          expression.typeArguments
+        );
+
+        return resolvedOverload.returnType;
+      }
+
       const parameterTypes = resolved.member.parameters.map((parameter) =>
         instantiateType(parameter.typeAnnotation, typeArguments)
       );
@@ -781,6 +849,18 @@ export class SemanticAnalyzer {
       }
 
       return 'boolean';
+    }
+
+    if (callee.overloadSignatures !== undefined) {
+      const resolvedOverload = this.resolveOverloadSignature(
+        expression.arguments,
+        expression.callee.name,
+        callee.overloadSignatures,
+        expression.callee.location,
+        expression.typeArguments
+      );
+
+      return resolvedOverload.returnType;
     }
 
     if (callee.parameterTypes !== undefined) {
@@ -903,9 +983,17 @@ export class SemanticAnalyzer {
 
     try {
       this.currentClass = statement;
+      this.validateMethodOverloads(statement);
 
       for (const member of statement.members) {
         if (member.kind === 'ClassProperty') {
+          if (containsUnknownType(member.typeAnnotation)) {
+            throw createTypeError(
+              `Property '${member.name.name}' in '${statement.identifier.name}' cannot use 'unknown'`,
+              member.name.location
+            );
+          }
+
           const initializerType = this.analyzeExpression(member.initializer);
 
           if (!areTypesCompatible(member.typeAnnotation, initializerType)) {
@@ -930,7 +1018,21 @@ export class SemanticAnalyzer {
           continue;
         }
 
-        this.analyzeDefaultParameters(member.parameters, member.name.name);
+        const overloadSignatures = this.getDeclaredMethods(statement, member.name.name, member.static).filter(
+          (declaredMethod) => declaredMethod.body === undefined && !declaredMethod.virtual && !statement.virtual
+        );
+        const isOverloadImplementation = member.body !== undefined && overloadSignatures.length > 0;
+
+        if (!isOverloadImplementation) {
+          this.analyzeDefaultParameters(member.parameters, member.name.name);
+        }
+
+        if (containsUnknownType(member.returnType)) {
+          throw createTypeError(
+            `Method '${member.name.name}' in '${statement.identifier.name}' cannot return 'unknown'`,
+            member.name.location
+          );
+        }
 
         if (member.name.name === 'toString') {
           if (member.parameters.length > 0) {
@@ -950,18 +1052,16 @@ export class SemanticAnalyzer {
 
         if (member.body === undefined) {
           if (!statement.virtual && !member.virtual) {
-            throw createTypeError(
-              `Method signature '${member.name.name}' must be virtual in abstract class '${statement.identifier.name}'`,
-              member.name.location
-            );
+            const implementation = this.getDeclaredMethodImplementation(statement, member.name.name, member.static);
+
+            if (implementation === undefined) {
+              throw createTypeError(
+                `Method overload '${member.name.name}' in '${statement.identifier.name}' requires an implementation`,
+                member.name.location
+              );
+            }
           }
 
-          if (!statement.abstract && !statement.virtual) {
-            throw createTypeError(
-              `Concrete class '${statement.identifier.name}' cannot contain method signature '${member.name.name}'`,
-              member.name.location
-            );
-          }
           continue;
         }
 
@@ -1011,6 +1111,13 @@ export class SemanticAnalyzer {
   private analyzeDefaultParameters(parameters: Parameter[], ownerName: string): void {
     this.withScope(() => {
       for (const parameter of parameters) {
+        if (containsUnknownType(parameter.typeAnnotation)) {
+          throw createTypeError(
+            `Parameter '${parameter.identifier.name}' in '${ownerName}' can only use 'unknown' in an overload implementation`,
+            parameter.identifier.location
+          );
+        }
+
         if (parameter.rest && !isArrayType(parameter.typeAnnotation)) {
           throw createTypeError(
             `Rest parameter '${parameter.identifier.name}' in '${ownerName}' must use an array type`,
@@ -1148,37 +1255,185 @@ export class SemanticAnalyzer {
   }
 
   private analyzeFunctionDeclaration(statement: FunctionDeclaration): void {
-    const restParameter = statement.parameters.find((parameter) => parameter.rest);
+    if (containsUnknownType(statement.returnType)) {
+      throw createTypeError(
+        `Function '${statement.identifier.name}' cannot return 'unknown'`,
+        statement.identifier.location
+      );
+    }
+
+    const signature = this.buildCallableSignature(statement.parameters, statement.returnType, statement.typeParameters);
+    const existing = this.scope.lookupCurrent(statement.identifier.name);
+    const usesDefaultOrRest = statement.parameters.some(
+      (parameter) => parameter.defaultValue !== undefined || parameter.rest
+    );
+
+    if (statement.body === undefined) {
+      if (usesDefaultOrRest) {
+        throw createTypeError(
+          `Overload signature '${statement.identifier.name}' cannot use default or rest parameters`,
+          statement.identifier.location
+        );
+      }
+
+      if (existing?.classDeclaration !== undefined || (existing !== undefined && existing.type !== 'function')) {
+        throw createSyntaxError(
+          `Binding '${statement.identifier.name}' is already defined`,
+          statement.identifier.location
+        );
+      }
+
+      if (existing !== undefined && existing.overloadSignatures === undefined) {
+        throw createTypeError(
+          `Overload signature '${statement.identifier.name}' must appear before its implementation`,
+          statement.identifier.location
+        );
+      }
+
+      if (existing === undefined) {
+        this.scope.define(
+          {
+            callable: true,
+            mutable: false,
+            name: statement.identifier.name,
+            overloadSignatures: [signature],
+            returnType: statement.returnType,
+            type: 'function',
+          },
+          statement.identifier.location
+        );
+      } else {
+        const overloadSignatures = existing.overloadSignatures ?? [];
+
+        for (const overloadSignature of overloadSignatures) {
+          this.canAddOverloadSignature(
+            overloadSignature,
+            signature,
+            statement.identifier.location,
+            statement.identifier.name
+          );
+        }
+
+        this.scope.replace({
+          ...existing,
+          overloadSignatures: [...overloadSignatures, signature],
+        });
+      }
+
+      return;
+    }
+
+    const hasOverloads = existing?.overloadSignatures !== undefined;
+
+    if (existing !== undefined && !hasOverloads) {
+      throw createSyntaxError(
+        `Binding '${statement.identifier.name}' is already defined`,
+        statement.identifier.location
+      );
+    }
+
+    if (hasOverloads) {
+      if (usesDefaultOrRest) {
+        throw createTypeError(
+          `Overload implementation '${statement.identifier.name}' cannot use default or rest parameters`,
+          statement.identifier.location
+        );
+      }
+
+      const overloadSignatures = existing?.overloadSignatures ?? [];
+
+      for (const overloadSignature of overloadSignatures) {
+        if (overloadSignature.parameterTypes.length !== signature.parameterTypes.length) {
+          throw createTypeError(
+            `Overload implementation '${statement.identifier.name}' must keep the same parameter count`,
+            statement.identifier.location
+          );
+        }
+
+        if (overloadSignature.returnType !== signature.returnType) {
+          throw createTypeError(
+            `Overload implementation '${statement.identifier.name}' must keep the same return type`,
+            statement.identifier.location
+          );
+        }
+      }
+
+      for (const [index, parameter] of statement.parameters.entries()) {
+        const overloadedTypes = new Set(
+          overloadSignatures.map((overloadSignature) => overloadSignature.parameterTypes[index] ?? 'unknown')
+        );
+        const [expectedType] = [...overloadedTypes];
+
+        if (overloadedTypes.size > 1 && parameter.typeAnnotation !== 'unknown') {
+          throw createTypeError(
+            `Parameter '${parameter.identifier.name}' in overload implementation '${statement.identifier.name}' must use 'unknown'`,
+            parameter.identifier.location
+          );
+        }
+
+        if (overloadedTypes.size === 1 && parameter.typeAnnotation === 'unknown') {
+          throw createTypeError(
+            `Parameter '${parameter.identifier.name}' in overload implementation '${statement.identifier.name}' cannot use 'unknown' unless the overload varies at this position`,
+            parameter.identifier.location
+          );
+        }
+
+        if (overloadedTypes.size === 1 && expectedType !== undefined && parameter.typeAnnotation !== expectedType) {
+          throw createTypeError(
+            `Parameter '${parameter.identifier.name}' in overload implementation '${statement.identifier.name}' must match '${expectedType}'`,
+            parameter.identifier.location
+          );
+        }
+      }
+    } else {
+      for (const parameter of statement.parameters) {
+        if (containsUnknownType(parameter.typeAnnotation)) {
+          throw createTypeError(
+            `Parameter '${parameter.identifier.name}' in '${statement.identifier.name}' can only use 'unknown' in an overload implementation`,
+            parameter.identifier.location
+          );
+        }
+      }
+    }
+
     const symbol: SemanticSymbol = {
       arity: statement.parameters.length,
       callable: true,
-      minArity: this.getMinimumArity(statement.parameters),
+      minArity: signature.minArity,
       mutable: false,
       name: statement.identifier.name,
-      parameterTypes: statement.parameters.map((parameter) => parameter.typeAnnotation),
+      parameterTypes: signature.parameterTypes,
       returnType: statement.returnType,
       type: 'function',
+      typeParameters: statement.typeParameters,
     };
 
-    if (restParameter !== undefined) {
-      symbol.restParameterType = restParameter.typeAnnotation;
+    if (signature.restParameterType !== undefined) {
+      symbol.restParameterType = signature.restParameterType;
     }
 
-    if (statement.typeParameters.length > 0) {
-      symbol.typeParameters = statement.typeParameters;
+    if (hasOverloads) {
+      if (existing?.overloadSignatures !== undefined) {
+        symbol.overloadSignatures = existing.overloadSignatures;
+      }
+      this.scope.replace(symbol);
+    } else {
+      this.scope.define(symbol, statement.identifier.location);
     }
-
-    this.scope.define(symbol, statement.identifier.location);
 
     const previousReturnType = this.currentReturnType;
+    const functionBody = statement.body;
 
     try {
-      this.analyzeDefaultParameters(statement.parameters, statement.identifier.name);
+      if (!hasOverloads) {
+        this.analyzeDefaultParameters(statement.parameters, statement.identifier.name);
+      }
+
       this.currentReturnType = statement.returnType;
       this.withScope(() => {
         this.defineParameters(statement.parameters);
 
-        for (const bodyStatement of statement.body) {
+        for (const bodyStatement of functionBody) {
           this.analyzeStatement(bodyStatement);
         }
       });
@@ -1186,7 +1441,7 @@ export class SemanticAnalyzer {
       this.currentReturnType = previousReturnType;
     }
 
-    if (statement.returnType !== 'void' && !this.hasReturnStatement(statement.body)) {
+    if (statement.returnType !== 'void' && !this.hasReturnStatement(functionBody)) {
       throw createTypeError(
         `Function '${statement.identifier.name}' must return a value of type '${statement.returnType}'`,
         statement.identifier.location
@@ -1562,6 +1817,13 @@ export class SemanticAnalyzer {
         );
       }
 
+      if (type === 'unknown') {
+        throw createTypeError(
+          `Cannot infer type for binding '${statement.identifier.name}' initialized with unknown value`,
+          statement.identifier.location
+        );
+      }
+
       this.scope.define(
         {
           callable: false,
@@ -1572,6 +1834,13 @@ export class SemanticAnalyzer {
         statement.identifier.location
       );
       return;
+    }
+
+    if (containsUnknownType(statement.typeAnnotation)) {
+      throw createTypeError(
+        `Binding '${statement.identifier.name}' cannot declare type 'unknown'`,
+        statement.identifier.location
+      );
     }
 
     if (!areTypesCompatible(statement.typeAnnotation, type)) {
@@ -1609,6 +1878,26 @@ export class SemanticAnalyzer {
 
   private buildAppliedGenericType(baseName: string, typeArguments: TypeName[]): TypeName {
     return typeArguments.length === 0 ? baseName : `${baseName}<${typeArguments.join(',')}>`;
+  }
+
+  private buildCallableSignature(
+    parameters: Parameter[],
+    returnType: SemanticType,
+    typeParameters: TypeParameter[]
+  ): CallableSignature {
+    const restParameter = parameters.find((parameter) => parameter.rest);
+    const signature: CallableSignature = {
+      minArity: this.getMinimumArity(parameters),
+      parameterTypes: parameters.map((parameter) => parameter.typeAnnotation),
+      returnType,
+      typeParameters,
+    };
+
+    if (restParameter !== undefined) {
+      signature.restParameterType = restParameter.typeAnnotation;
+    }
+
+    return signature;
   }
 
   private buildTypeArgumentMap(
@@ -1654,6 +1943,42 @@ export class SemanticAnalyzer {
     }
 
     return typeArguments;
+  }
+
+  private canAddOverloadSignature(
+    existingSignature: CallableSignature,
+    nextSignature: CallableSignature,
+    location: Identifier['location'],
+    ownerName: string
+  ): void {
+    if (existingSignature.returnType !== nextSignature.returnType) {
+      throw createTypeError(`Overload '${ownerName}' must keep the same return type`, location);
+    }
+
+    if (existingSignature.typeParameters.length !== nextSignature.typeParameters.length) {
+      throw createTypeError(`Overload '${ownerName}' must keep the same generic parameter list`, location);
+    }
+
+    const typeParametersMatch = existingSignature.typeParameters.every(
+      (typeParameter, index) =>
+        typeParameter.identifier.name === nextSignature.typeParameters[index]?.identifier.name &&
+        typeParameter.defaultType === nextSignature.typeParameters[index]?.defaultType
+    );
+
+    if (!typeParametersMatch) {
+      throw createTypeError(`Overload '${ownerName}' must keep the same generic parameter list`, location);
+    }
+
+    const sameParameters =
+      existingSignature.parameterTypes.length === nextSignature.parameterTypes.length &&
+      existingSignature.parameterTypes.every(
+        (parameterType, index) => parameterType === nextSignature.parameterTypes[index]
+      ) &&
+      existingSignature.restParameterType === nextSignature.restParameterType;
+
+    if (sameParameters) {
+      throw createTypeError(`Overload '${ownerName}' already defines this signature`, location);
+    }
   }
 
   private defineParameters(parameters: Parameter[]): void {
@@ -1886,6 +2211,27 @@ export class SemanticAnalyzer {
     return statement.members.find((member): member is ClassConstructor => member.kind === 'ClassConstructor');
   }
 
+  private getDeclaredMethodImplementation(
+    statement: ClassDeclaration,
+    name: string,
+    isStatic: boolean
+  ): ClassMethod | undefined {
+    return statement.members.find(
+      (member): member is ClassMethod =>
+        member.kind === 'ClassMethod' &&
+        member.name.name === name &&
+        member.static === isStatic &&
+        member.body !== undefined
+    );
+  }
+
+  private getDeclaredMethods(statement: ClassDeclaration, name: string, isStatic: boolean): ClassMethod[] {
+    return statement.members.filter(
+      (member): member is ClassMethod =>
+        member.kind === 'ClassMethod' && member.name.name === name && member.static === isStatic
+    );
+  }
+
   private getErrorBaseClass(): ClassDeclaration {
     return this.getClassDeclaration({
       kind: 'Identifier',
@@ -1951,10 +2297,12 @@ export class SemanticAnalyzer {
     name: string,
     isStatic: boolean
   ): { member: ClassMethod; owner: ClassDeclaration } | undefined {
-    const method = statement.members.find(
-      (member): member is ClassMethod =>
-        member.kind === 'ClassMethod' && member.name.name === name && member.static === isStatic
-    );
+    const method =
+      this.getDeclaredMethodImplementation(statement, name, isStatic) ??
+      statement.members.find(
+        (member): member is ClassMethod =>
+          member.kind === 'ClassMethod' && member.name.name === name && member.static === isStatic
+      );
 
     if (method !== undefined) {
       return {
@@ -1985,6 +2333,35 @@ export class SemanticAnalyzer {
 
     if (statement.baseClass !== undefined) {
       return this.getMethod(this.getClassDeclaration(statement.baseClass), name, isStatic);
+    }
+
+    return undefined;
+  }
+
+  private getMethodCallTarget(
+    statement: ClassDeclaration,
+    name: string,
+    isStatic: boolean
+  ): { implementation: ClassMethod; overloadSignatures: CallableSignature[]; owner: ClassDeclaration } | undefined {
+    const declaredMethods = this.getDeclaredMethods(statement, name, isStatic);
+    const implementation = declaredMethods.find((member) => member.body !== undefined);
+    const overloadMembers = declaredMethods.filter(
+      (member): member is ClassMethod =>
+        member.kind === 'ClassMethod' && member.body === undefined && !member.virtual && !statement.virtual
+    );
+
+    if (implementation !== undefined) {
+      return {
+        implementation,
+        overloadSignatures: overloadMembers.map((member) =>
+          this.buildCallableSignature(member.parameters, member.returnType, [])
+        ),
+        owner: statement,
+      };
+    }
+
+    if (statement.baseClass !== undefined) {
+      return this.getMethodCallTarget(this.getClassDeclaration(statement.baseClass), name, isStatic);
     }
 
     return undefined;
@@ -2230,6 +2607,67 @@ export class SemanticAnalyzer {
     return member;
   }
 
+  private resolveOverloadSignature(
+    args: Expression[],
+    ownerName: string,
+    signatures: CallableSignature[],
+    location: Identifier['location'],
+    explicitTypeArguments: TypeName[]
+  ): { returnType: SemanticType; typeArguments?: Map<string, TypeName> } {
+    let matched:
+      | {
+          returnType: SemanticType;
+          typeArguments?: Map<string, TypeName>;
+        }
+      | undefined;
+
+    for (const signature of signatures) {
+      try {
+        if (signature.typeParameters.length > 0) {
+          const typeArguments = this.analyzeGenericArguments(
+            args,
+            signature.parameterTypes,
+            signature.typeParameters,
+            explicitTypeArguments,
+            location,
+            ownerName,
+            signature.restParameterType
+          ).returnTypeArguments;
+
+          if (matched !== undefined) {
+            throw createTypeError(`Call to '${ownerName}' is ambiguous`, location);
+          }
+
+          matched = {
+            returnType: instantiateType(signature.returnType, typeArguments),
+            typeArguments,
+          };
+          continue;
+        }
+
+        this.analyzeArguments(args, signature.parameterTypes, ownerName, signature.restParameterType);
+
+        if (matched !== undefined) {
+          throw createTypeError(`Call to '${ownerName}' is ambiguous`, location);
+        }
+
+        matched = {
+          returnType: signature.returnType,
+        };
+      } catch (error) {
+        if (!(error instanceof Error) || !('name' in error) || error.name !== 'TypeError') {
+          throw error;
+        }
+      }
+    }
+
+    if (matched === undefined) {
+      throw createTypeError(`No overload for '${ownerName}' matches the provided arguments`, location);
+    }
+
+    return matched;
+  }
+
   private validateExceptClauses(exceptClauses: ExceptClause[]): void {
     const errorBaseClass = this.getErrorBaseClass();
     const seenClasses: ClassDeclaration[] = [];
@@ -2263,6 +2701,123 @@ export class SemanticAnalyzer {
       }
 
       seenClasses.push(errorClass);
+    }
+  }
+
+  private validateMethodOverloads(statement: ClassDeclaration): void {
+    const groups = new Map<string, ClassMethod[]>();
+
+    for (const member of statement.members) {
+      if (member.kind !== 'ClassMethod') {
+        continue;
+      }
+
+      const key = `${member.static ? 'static' : 'instance'}:${member.name.name}`;
+      const group = groups.get(key) ?? [];
+      group.push(member);
+      groups.set(key, group);
+    }
+
+    for (const [key, group] of groups) {
+      const signatures = group.filter((member) => member.body === undefined && !member.virtual && !statement.virtual);
+
+      if (signatures.length === 0) {
+        continue;
+      }
+
+      const implementation = group.find((member) => member.body !== undefined);
+
+      if (implementation === undefined) {
+        throw createTypeError(
+          `Method overload '${group[0]?.name.name ?? key}' in '${statement.identifier.name}' requires an implementation`,
+          group[0]?.name.location
+        );
+      }
+
+      const implementationIndex = group.indexOf(implementation);
+
+      if (group.slice(implementationIndex + 1).some((member) => member.body === undefined && !member.virtual)) {
+        throw createTypeError(
+          `Overload implementation '${implementation.name.name}' in '${statement.identifier.name}' must appear after all signatures`,
+          implementation.name.location
+        );
+      }
+
+      for (const signature of signatures) {
+        if (signature.parameters.some((parameter) => parameter.defaultValue !== undefined || parameter.rest)) {
+          throw createTypeError(
+            `Overload '${signature.name.name}' in '${statement.identifier.name}' cannot use default or rest parameters`,
+            signature.name.location
+          );
+        }
+
+        if (signature.access !== implementation.access || signature.static !== implementation.static) {
+          throw createTypeError(
+            `Overload '${signature.name.name}' in '${statement.identifier.name}' must keep the same access and static modifier`,
+            signature.name.location
+          );
+        }
+
+        if (signature.returnType !== implementation.returnType) {
+          throw createTypeError(
+            `Overload '${signature.name.name}' in '${statement.identifier.name}' must keep the same return type`,
+            signature.name.location
+          );
+        }
+      }
+
+      for (const [index, signature] of signatures.entries()) {
+        for (const previousSignature of signatures.slice(0, index)) {
+          this.canAddOverloadSignature(
+            this.buildCallableSignature(previousSignature.parameters, previousSignature.returnType, []),
+            this.buildCallableSignature(signature.parameters, signature.returnType, []),
+            signature.name.location,
+            `${statement.identifier.name}.${signature.name.name}`
+          );
+        }
+      }
+
+      if (implementation.parameters.some((parameter) => parameter.defaultValue !== undefined || parameter.rest)) {
+        throw createTypeError(
+          `Overload implementation '${implementation.name.name}' in '${statement.identifier.name}' cannot use default or rest parameters`,
+          implementation.name.location
+        );
+      }
+
+      if (implementation.parameters.length !== signatures[0]?.parameters.length) {
+        throw createTypeError(
+          `Overload implementation '${implementation.name.name}' in '${statement.identifier.name}' must keep the same parameter count`,
+          implementation.name.location
+        );
+      }
+
+      for (const [index, parameter] of implementation.parameters.entries()) {
+        const overloadedTypes = new Set(
+          signatures.map((signature) => signature.parameters[index]?.typeAnnotation ?? 'unknown')
+        );
+        const [expectedType] = [...overloadedTypes];
+
+        if (overloadedTypes.size > 1 && parameter.typeAnnotation !== 'unknown') {
+          throw createTypeError(
+            `Parameter '${parameter.identifier.name}' in overload implementation '${statement.identifier.name}.${implementation.name.name}' must use 'unknown'`,
+            parameter.identifier.location
+          );
+        }
+
+        if (overloadedTypes.size === 1 && parameter.typeAnnotation === 'unknown') {
+          throw createTypeError(
+            `Parameter '${parameter.identifier.name}' in overload implementation '${statement.identifier.name}.${implementation.name.name}' cannot use 'unknown' unless the overload varies at this position`,
+            parameter.identifier.location
+          );
+        }
+
+        if (overloadedTypes.size === 1 && expectedType !== undefined && parameter.typeAnnotation !== expectedType) {
+          throw createTypeError(
+            `Parameter '${parameter.identifier.name}' in overload implementation '${statement.identifier.name}.${implementation.name.name}' must match '${expectedType}'`,
+            parameter.identifier.location
+          );
+        }
+      }
     }
   }
 

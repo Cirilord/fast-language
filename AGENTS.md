@@ -47,6 +47,10 @@ This file tracks working conventions for the `fast` language project so future c
 - Functions use `function name(parameter: type): type { return value; }`.
 - Parameters can use default values, like `label: string = "status"`.
 - Rest parameters use typed arrays and come last, like `...items: string[]`.
+- Functions and class methods support overloads through repeated signatures without bodies followed by one implementation body.
+- Overload implementations must come after their signatures, keep the same parameter count, and use `unknown` for any parameter position whose type varies across signatures.
+- `unknown` is reserved for overload implementations and is rejected in normal bindings, properties, return types, and regular parameters.
+- Overload groups currently do not support default parameters or rest parameters.
 - Functions and classes can declare generics with defaults, like `<T, K = string>`.
 - Function return values must match the declared return type.
 - Functions that do not return a value use `void`, like `function name(): void { ... }`.
