@@ -19,10 +19,10 @@
       "include": "#generics"
     },
     {
-      "include": "#keywords"
+      "include": "#builtins"
     },
     {
-      "include": "#builtins"
+      "include": "#keywords"
     },
     {
       "include": "#identifiers"
@@ -37,6 +37,10 @@
   "repository": {
     "builtins": {
       "patterns": [
+        {
+          "name": "support.function.ts",
+          "match": "(?<=\\.)[A-Za-z_][A-Za-z0-9_]*(?=\\s*(?:<[^>]+>)?\\s*\\()"
+        },
         {
           "name": "support.function.ts",
           "match": "\\bprint\\b"

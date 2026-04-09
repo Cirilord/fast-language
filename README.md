@@ -38,6 +38,7 @@ Right now the project is implemented in TypeScript and already supports:
 - builtin namespace modules like `import Math from "math";`
 - builtin namespace modules like `import Array from "array";`
 - builtin namespace modules like `import String from "string";`
+- builtin named imports like `import { Buffer } from "bytes";`
 - named exports with `export var`, `export val`, `export function`, and `export name;`
 - symbolic enums like `enum Status { Pending, Done }`
 - byte declarations like `val channel: byte = 255;`
@@ -70,6 +71,7 @@ Right now the project is implemented in TypeScript and already supports:
 
 ```fast
 import Array from "array";
+import { Buffer } from "bytes";
 import Math from "math";
 import String from "string";
 import File1, { importedText, logImportedText } from "./file1";
@@ -129,6 +131,16 @@ val stringSplit: string[] = String.split("a,b,c", ",");
 val stringReplace: string = String.replace(sampleText, "Fast", "Slow");
 val stringPadStart: string = String.padStart("7", 3, "0");
 val stringPadEnd: string = String.padEnd("7", 3, "0");
+val bufferFromText: Buffer = Buffer.from("Fast");
+val bufferFromBytes: Buffer = Buffer.from([70, 97, 115, 116]);
+val bufferAllocated: Buffer = Buffer.alloc(4);
+val bufferFilled: Buffer = Buffer.alloc(4, "A");
+val bufferBytesFilled: Buffer = Buffer.alloc(4, [70, 65]);
+val bufferByteFilled: Buffer = Buffer.alloc(4, 65);
+val bufferText: string = bufferFromText.toString();
+val bufferHex: string = bufferFromText.toString("hex");
+val bufferBase64: string = bufferFromText.toString("base64");
+val bufferLength: int = bufferFromText.byteLength;
 
 enum LoadState {
   Idle,

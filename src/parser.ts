@@ -269,7 +269,7 @@ export class Parser {
       if (this.match(TokenType.Dot)) {
         let property: Token;
 
-        if (this.match(TokenType.Identifier, TokenType.Constructor)) {
+        if (this.match(TokenType.Identifier, TokenType.Constructor, TokenType.From)) {
           property = this.previous();
         } else {
           throw this.error(this.peek(), "Expected property name after '.'.");

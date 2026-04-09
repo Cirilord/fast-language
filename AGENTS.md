@@ -98,6 +98,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Builtin namespace modules can use plain names like `import Math from "math";`.
 - Builtin namespace modules can use plain names like `import Array from "array";`, `import Math from "math";`, and `import String from "string";`.
 - Named imports use `import { name } from "./file";` and resolve local `.fast` files.
+- Named imports can also load builtin classes like `import { Buffer } from "bytes";`.
 - Named exports can be inline, like `export var name = "Fast";`.
 - Enums use `enum Name { Member, Member }`, members are accessed like `Name.Member`, and enum values compare by equality and work in `switch`.
 - Named exports can reference existing bindings, like `export name;`.

@@ -1,18 +1,36 @@
-import type { NumberLiteralType, TypeParameter } from './ast';
+import { Buffer as NodeBuffer } from 'node:buffer';
+
+import type {
+  ClassDeclaration,
+  ClassMethod,
+  ClassProperty,
+  Expression,
+  Identifier,
+  NumberLiteral,
+  NumberLiteralType,
+  Parameter,
+  SourceLocation,
+  StringLiteral,
+  ThisExpression,
+  TypeParameter,
+} from './ast';
 import { createReferenceError, createTypeError } from './errors';
-import type { RuntimeModuleExports, RuntimeValue } from './runtime';
+import type { ClassValue, InstanceValue, RuntimeModuleExports, RuntimeValue } from './runtime';
 import type { CallableSignature, SemanticModuleExports, SemanticSymbol } from './semantic';
 
 const EMPTY_TYPE_PARAMETERS: TypeParameter[] = [];
+const BUILTIN_LOCATION: SourceLocation = {
+  column: 1,
+  line: 1,
+};
+const BUFFER_HIDDEN_BYTES_FIELD = '__buffer_bytes';
+const BUFFER_ENCODINGS = new Set(['ascii', 'utf8', 'utf16le', 'ucs2', 'base64', 'base64url', 'latin1', 'hex']);
 
 function createTypeParameter(name: string): TypeParameter {
   return {
     identifier: {
       kind: 'Identifier',
-      location: {
-        column: 1,
-        line: 1,
-      },
+      location: BUILTIN_LOCATION,
       name,
     },
     kind: 'TypeParameter',
@@ -20,6 +38,50 @@ function createTypeParameter(name: string): TypeParameter {
 }
 
 const ARRAY_TYPE_PARAMETERS: TypeParameter[] = [createTypeParameter('T')];
+
+function createIdentifier(name: string): Identifier {
+  return {
+    kind: 'Identifier',
+    location: BUILTIN_LOCATION,
+    name,
+  };
+}
+
+function createStringLiteral(value: string): StringLiteral {
+  return {
+    kind: 'StringLiteral',
+    value,
+  };
+}
+
+function createNumberLiteral(value: number, numberType: NumberLiteralType): NumberLiteral {
+  return {
+    kind: 'NumberLiteral',
+    numberType,
+    value,
+  };
+}
+
+function createParameter(name: string, typeAnnotation: string, defaultValue?: Expression): Parameter {
+  const parameter: Parameter = {
+    identifier: createIdentifier(name),
+    kind: 'Parameter',
+    rest: false,
+    typeAnnotation,
+  };
+
+  if (defaultValue !== undefined) {
+    parameter.defaultValue = defaultValue;
+  }
+
+  return parameter;
+}
+
+function createThisExpression(): ThisExpression {
+  return {
+    kind: 'ThisExpression',
+  };
+}
 
 function createNumberValue(value: number, numberType: NumberLiteralType = 'double'): RuntimeValue {
   return {
@@ -35,6 +97,24 @@ function createSemanticConstant(type: SemanticSymbol['type']): SemanticSymbol {
     mutable: false,
     name: '',
     type,
+  };
+}
+
+function createBuiltinMethod(
+  name: string,
+  parameters: Parameter[],
+  returnType: string,
+  isStatic: boolean
+): ClassMethod {
+  return {
+    access: 'public',
+    kind: 'ClassMethod',
+    name: createIdentifier(name),
+    override: false,
+    parameters,
+    returnType,
+    static: isStatic,
+    virtual: false,
   };
 }
 
@@ -135,6 +215,307 @@ function expectStringArgument(value: RuntimeValue | undefined, functionName: str
   }
 
   return value.value;
+}
+
+function expectByteArgument(value: RuntimeValue | undefined, functionName: string, index: number | string): number {
+  if (value?.type !== 'number' || value.numberType !== 'byte') {
+    throw createTypeError(`'${functionName}' expects byte at argument ${index}`);
+  }
+
+  return value.value;
+}
+
+function createByteArrayValue(values: number[]): RuntimeValue {
+  return {
+    elements: values.map((value) => createNumberValue(value, 'byte')),
+    type: 'array',
+  };
+}
+
+function expectByteArrayArgument(value: RuntimeValue | undefined, functionName: string, index: number): number[] {
+  if (value?.type !== 'array') {
+    throw createTypeError(`'${functionName}' expects byte[] at argument ${index}`);
+  }
+
+  return value.elements.map((element, elementIndex) =>
+    expectByteArgument(element, functionName, `${index}.${elementIndex + 1}`)
+  );
+}
+
+function expectEncodingArgument(
+  value: RuntimeValue | undefined,
+  functionName: string,
+  index: number,
+  defaultEncoding = 'utf8'
+): BufferEncoding {
+  const encoding = value === undefined ? defaultEncoding : expectStringArgument(value, functionName, index);
+
+  if (!BUFFER_ENCODINGS.has(encoding)) {
+    throw createTypeError(`'${functionName}' received unsupported encoding '${encoding}'`);
+  }
+
+  return encoding as BufferEncoding;
+}
+
+function createBufferClassDeclaration(): ClassDeclaration {
+  return {
+    abstract: false,
+    identifier: createIdentifier('Buffer'),
+    implements: [],
+    kind: 'ClassDeclaration',
+    members: [
+      {
+        access: 'private',
+        body: [],
+        kind: 'ClassConstructor',
+        parameters: [],
+      },
+      {
+        ...createBuiltinMethod(
+          'from',
+          [createParameter('value', 'unknown'), createParameter('encoding', 'string', createStringLiteral('utf8'))],
+          'Buffer',
+          true
+        ),
+      },
+      {
+        ...createBuiltinMethod(
+          'alloc',
+          [
+            createParameter('size', 'int'),
+            createParameter('fill', 'unknown', createNumberLiteral(0, 'byte')),
+            createParameter('encoding', 'string', createStringLiteral('utf8')),
+          ],
+          'Buffer',
+          true
+        ),
+      },
+      {
+        access: 'public',
+        declarationType: 'val',
+        initializer: createNumberLiteral(0, 'byte'),
+        kind: 'ClassProperty',
+        name: createIdentifier('byteLength'),
+        static: false,
+        typeAnnotation: 'int',
+      } satisfies ClassProperty,
+      {
+        ...createBuiltinMethod(
+          'toString',
+          [createParameter('encoding', 'string', createStringLiteral('utf8'))],
+          'string',
+          false
+        ),
+      },
+      {
+        ...createBuiltinMethod(
+          'fill',
+          [
+            createParameter('value', 'unknown'),
+            createParameter('offset', 'int', createNumberLiteral(0, 'byte')),
+            createParameter('end', 'int', {
+              kind: 'MemberExpression',
+              object: createThisExpression(),
+              property: createIdentifier('byteLength'),
+            }),
+            createParameter('encoding', 'string', createStringLiteral('utf8')),
+          ],
+          'Buffer',
+          false
+        ),
+      },
+    ],
+    typeParameters: [],
+    virtual: false,
+  };
+}
+
+function createBufferClassValue(declaration: ClassDeclaration): ClassValue {
+  const classValue: ClassValue = {
+    abstract: false,
+    declaration,
+    instanceMethods: new Map<string, ClassMethod>(),
+    instanceProperties: [],
+    name: 'Buffer',
+    staticMethods: new Map<string, ClassMethod>(),
+    staticProperties: new Map<string, { mutable: boolean; typeAnnotation?: string; value: RuntimeValue }>([
+      [
+        'name',
+        {
+          mutable: false,
+          typeAnnotation: 'string',
+          value: {
+            type: 'string',
+            value: 'Buffer',
+          },
+        },
+      ],
+    ]),
+    type: 'class',
+    virtual: false,
+  };
+
+  classValue.staticProperties.set('from', {
+    mutable: false,
+    value: {
+      call: ([value, encoding]): RuntimeValue =>
+        createBufferInstanceFromValue(classValue, value, encoding, 'Buffer.from'),
+      name: 'Buffer.from',
+      type: 'native-function',
+    },
+  });
+  classValue.staticProperties.set('alloc', {
+    mutable: false,
+    value: {
+      call: ([size, fill, encoding]): RuntimeValue => createAllocatedBufferInstance(classValue, size, fill, encoding),
+      name: 'Buffer.alloc',
+      type: 'native-function',
+    },
+  });
+
+  return classValue;
+}
+
+function getBufferBytes(instance: InstanceValue): number[] {
+  const hidden = instance.fields.get(BUFFER_HIDDEN_BYTES_FIELD)?.value;
+  return expectByteArrayArgument(hidden, 'Buffer', 0);
+}
+
+function updateBufferBytes(instance: InstanceValue, bytes: number[]): void {
+  const byteArrayValue = createByteArrayValue(bytes);
+  const hidden = instance.fields.get(BUFFER_HIDDEN_BYTES_FIELD);
+  const byteLength = instance.fields.get('byteLength');
+
+  if (hidden !== undefined) {
+    hidden.value = byteArrayValue;
+  }
+
+  if (byteLength !== undefined) {
+    byteLength.value = createNumberValue(bytes.length, 'int');
+  }
+}
+
+function createBufferInstance(classValue: ClassValue, bytes: number[]): InstanceValue {
+  const instance: InstanceValue = {
+    classValue,
+    fields: new Map(),
+    type: 'instance',
+  };
+
+  instance.fields.set(BUFFER_HIDDEN_BYTES_FIELD, {
+    mutable: true,
+    typeAnnotation: 'byte[]',
+    value: createByteArrayValue(bytes),
+  });
+  instance.fields.set('byteLength', {
+    mutable: false,
+    typeAnnotation: 'int',
+    value: createNumberValue(bytes.length, 'int'),
+  });
+  instance.fields.set('toString', {
+    mutable: false,
+    value: {
+      call: ([encoding]): RuntimeValue => ({
+        type: 'string',
+        value: NodeBuffer.from(getBufferBytes(instance)).toString(
+          expectEncodingArgument(encoding, 'Buffer.toString', 1)
+        ),
+      }),
+      name: 'Buffer.toString',
+      type: 'native-function',
+    },
+  });
+  instance.fields.set('fill', {
+    mutable: false,
+    value: {
+      call: ([value, offset, end, encoding]): RuntimeValue => {
+        const source = NodeBuffer.from(getBufferBytes(instance));
+        const startOffset = offset === undefined ? 0 : expectIntegerArgument(offset, 'Buffer.fill', 2);
+        const endOffset = end === undefined ? source.length : expectIntegerArgument(end, 'Buffer.fill', 3);
+
+        if (value === undefined) {
+          throw createTypeError("'Buffer.fill' expects value at argument 1");
+        }
+
+        if (value.type === 'string') {
+          source.fill(value.value, startOffset, endOffset, expectEncodingArgument(encoding, 'Buffer.fill', 4));
+        } else if (value.type === 'array') {
+          source.fill(NodeBuffer.from(expectByteArrayArgument(value, 'Buffer.fill', 1)), startOffset, endOffset);
+        } else {
+          source.fill(expectByteArgument(value, 'Buffer.fill', 1), startOffset, endOffset);
+        }
+
+        updateBufferBytes(instance, [...source]);
+        return instance;
+      },
+      name: 'Buffer.fill',
+      type: 'native-function',
+    },
+  });
+
+  return instance;
+}
+
+function createBufferInstanceFromValue(
+  classValue: ClassValue,
+  value: RuntimeValue | undefined,
+  encoding: RuntimeValue | undefined,
+  functionName: string
+): RuntimeValue {
+  if (value === undefined) {
+    throw createTypeError(`'${functionName}' expects value at argument 1`);
+  }
+
+  if (value.type === 'string') {
+    return createBufferInstance(classValue, [
+      ...NodeBuffer.from(value.value, expectEncodingArgument(encoding, functionName, 2)),
+    ]);
+  }
+
+  if (value.type === 'array') {
+    if (encoding !== undefined) {
+      throw createTypeError(`'${functionName}' does not accept encoding when value is byte[]`);
+    }
+
+    return createBufferInstance(classValue, [...NodeBuffer.from(expectByteArrayArgument(value, functionName, 1))]);
+  }
+
+  throw createTypeError(`'${functionName}' expects string or byte[] at argument 1`);
+}
+
+function createAllocatedBufferInstance(
+  classValue: ClassValue,
+  size: RuntimeValue | undefined,
+  fill: RuntimeValue | undefined,
+  encoding: RuntimeValue | undefined
+): RuntimeValue {
+  const bufferSize = expectIntegerArgument(size, 'Buffer.alloc', 1);
+
+  if (bufferSize < 0) {
+    throw createTypeError("'Buffer.alloc' expects a non-negative size");
+  }
+
+  let buffer: NodeBuffer;
+
+  if (fill === undefined) {
+    buffer = NodeBuffer.alloc(bufferSize);
+  } else if (fill.type === 'string') {
+    buffer = NodeBuffer.alloc(bufferSize, fill.value, expectEncodingArgument(encoding, 'Buffer.alloc', 3));
+  } else if (fill.type === 'array') {
+    if (encoding !== undefined) {
+      throw createTypeError("'Buffer.alloc' does not accept encoding when fill is byte[]");
+    }
+
+    buffer = NodeBuffer.alloc(bufferSize, NodeBuffer.from(expectByteArrayArgument(fill, 'Buffer.alloc', 2)));
+  } else {
+    if (encoding !== undefined) {
+      throw createTypeError("'Buffer.alloc' does not accept encoding when fill is byte");
+    }
+
+    buffer = NodeBuffer.alloc(bufferSize, expectByteArgument(fill, 'Buffer.alloc', 2));
+  }
+
+  return createBufferInstance(classValue, [...buffer]);
 }
 
 function getArrayElementAt(elements: RuntimeValue[], index: number, functionName: string): RuntimeValue {
@@ -1009,6 +1390,30 @@ function createStringSemanticExports(): SemanticModuleExports {
   return exports;
 }
 
+function createBytesRuntimeExports(): RuntimeModuleExports {
+  const exports = new Map<string, RuntimeValue>();
+  const bufferDeclaration = createBufferClassDeclaration();
+  const bufferClassValue = createBufferClassValue(bufferDeclaration);
+
+  exports.set('Buffer', bufferClassValue);
+  return exports;
+}
+
+function createBytesSemanticExports(): SemanticModuleExports {
+  const exports = new Map<string, SemanticSymbol>();
+  const bufferDeclaration = createBufferClassDeclaration();
+
+  exports.set('Buffer', {
+    callable: false,
+    classDeclaration: bufferDeclaration,
+    mutable: false,
+    name: 'Buffer',
+    type: 'Buffer',
+  });
+
+  return exports;
+}
+
 const BUILTIN_MODULES = new Map<
   string,
   {
@@ -1017,6 +1422,7 @@ const BUILTIN_MODULES = new Map<
   }
 >([
   ['array', { runtimeExports: createArrayRuntimeExports(), semanticExports: createArraySemanticExports() }],
+  ['bytes', { runtimeExports: createBytesRuntimeExports(), semanticExports: createBytesSemanticExports() }],
   ['math', { runtimeExports: createMathRuntimeExports(), semanticExports: createMathSemanticExports() }],
   ['string', { runtimeExports: createStringRuntimeExports(), semanticExports: createStringSemanticExports() }],
 ]);

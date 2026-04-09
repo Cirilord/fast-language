@@ -1994,11 +1994,23 @@ export class Interpreter {
       return result.value;
     }
 
+    const nativeToString = instance.fields.get('toString')?.value;
+
+    if (nativeToString?.type === 'native-function') {
+      const result = nativeToString.call([]);
+
+      if (result.type !== 'string') {
+        throw createTypeError(`Method '${instance.classValue.name}.toString' must return a string`);
+      }
+
+      return result.value;
+    }
+
     const fields = [...instance.fields.entries()].map(
       ([name, binding]) => `${name}: ${this.runtimeValueToString(binding.value)}`
     );
 
-    return `${instance.classValue.name} { ${fields.join(', ')} }`;
+    return `${instance.classValue.name} { ${fields.filter((field) => !field.startsWith('__')).join(', ')} }`;
   }
 
   private renderUserFunctionValue(functionValue: UserFunctionValue): string {

@@ -2045,6 +2045,10 @@ export class SemanticAnalyzer {
         importedSymbol.enumDeclaration = exportedSymbol.enumDeclaration;
       }
 
+      if (exportedSymbol.classDeclaration !== undefined) {
+        importedSymbol.classDeclaration = exportedSymbol.classDeclaration;
+      }
+
       if (exportedSymbol.arity !== undefined) {
         importedSymbol.arity = exportedSymbol.arity;
       }
