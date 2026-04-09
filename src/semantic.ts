@@ -64,6 +64,7 @@ export type SemanticSymbol = {
   minArity?: number;
   mutable: boolean;
   name: string;
+  namespaceExports?: SemanticModuleExports;
   overloadSignatures?: CallableSignature[];
   parameterTypes?: TypeName[];
   restParameterType?: TypeName;
@@ -833,6 +834,46 @@ export class SemanticAnalyzer {
 
   private analyzeCallExpression(expression: CallExpression): SemanticType {
     if (expression.callee.kind === 'MemberExpression') {
+      if (expression.callee.object.kind === 'Identifier') {
+        const objectSymbol = this.scope.lookup(expression.callee.object.name, expression.callee.object.location);
+
+        if (objectSymbol.namespaceExports !== undefined) {
+          const exportedSymbol = objectSymbol.namespaceExports.get(expression.callee.property.name);
+
+          if (exportedSymbol === undefined) {
+            throw createReferenceError(
+              `Module namespace '${expression.callee.object.name}' does not export '${expression.callee.property.name}'`,
+              expression.callee.property.location
+            );
+          }
+
+          if (!exportedSymbol.callable) {
+            throw createTypeError(
+              `Member '${expression.callee.property.name}' is not callable`,
+              expression.callee.property.location
+            );
+          }
+
+          const parameterTypes = exportedSymbol.parameterTypes ?? [];
+
+          this.analyzeArguments(
+            expression.arguments,
+            parameterTypes,
+            expression.callee.property.name,
+            exportedSymbol.restParameterType
+          );
+
+          if (expression.arguments.length < (exportedSymbol.minArity ?? 0)) {
+            throw createTypeError(
+              `'${expression.callee.property.name}' expects at least ${exportedSymbol.minArity ?? 0} arguments, got ${expression.arguments.length}`,
+              expression.callee.property.location
+            );
+          }
+
+          return exportedSymbol.returnType ?? 'unknown';
+        }
+      }
+
       const calleeObjectType = this.analyzeExpression(expression.callee.object);
 
       if (calleeObjectType === 'function') {
@@ -1777,6 +1818,19 @@ export class SemanticAnalyzer {
 
     const moduleExports = this.resolveImport(statement.source.value);
 
+    if (statement.namespaceIdentifier !== undefined) {
+      this.scope.define(
+        {
+          callable: false,
+          mutable: false,
+          name: statement.namespaceIdentifier.name,
+          namespaceExports: moduleExports,
+          type: 'namespace',
+        },
+        statement.namespaceIdentifier.location
+      );
+    }
+
     for (const identifier of statement.identifiers) {
       const exportedSymbol = moduleExports.get(identifier.name);
 
@@ -1822,6 +1876,10 @@ export class SemanticAnalyzer {
         importedSymbol.typeParameters = exportedSymbol.typeParameters;
       }
 
+      if (exportedSymbol.namespaceExports !== undefined) {
+        importedSymbol.namespaceExports = exportedSymbol.namespaceExports;
+      }
+
       this.scope.define(importedSymbol, identifier.location);
     }
   }
@@ -1848,6 +1906,19 @@ export class SemanticAnalyzer {
   private analyzeMemberExpression(expression: MemberExpression): SemanticType {
     if (expression.object.kind === 'Identifier') {
       const objectSymbol = this.scope.lookup(expression.object.name, expression.object.location);
+
+      if (objectSymbol.namespaceExports !== undefined) {
+        const exportedSymbol = objectSymbol.namespaceExports.get(expression.property.name);
+
+        if (exportedSymbol === undefined) {
+          throw createReferenceError(
+            `Module namespace '${expression.object.name}' does not export '${expression.property.name}'`,
+            expression.property.location
+          );
+        }
+
+        return exportedSymbol.type;
+      }
 
       if (objectSymbol.enumDeclaration !== undefined) {
         const member = this.resolveEnumMemberExpression(expression);

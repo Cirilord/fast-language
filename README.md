@@ -30,7 +30,9 @@ Right now the project is implemented in TypeScript and already supports:
 - member access with `.`, including `this`, `super`, and static members
 - every class exposes an implicit static `name`, and instances can access it through `this.constructor.name`
 - classes expose an implicit `toString()`, instances can override `toString(): string`, and `print(instance)` uses it automatically
+- namespace imports with `import File from "./file";`
 - named imports with `import { name } from "./file";`
+- combined imports with `import File, { name } from "./file";`
 - named exports with `export var`, `export val`, `export function`, and `export name;`
 - symbolic enums like `enum Status { Pending, Done }`
 - typed numeric declarations like `var count: int = 10;`
@@ -61,7 +63,7 @@ Right now the project is implemented in TypeScript and already supports:
 `main.fast`
 
 ```fast
-import { importedText, logImportedText } from "./file1";
+import File1, { importedText, logImportedText } from "./file1";
 
 // Number types are declared on variables.
 val items: string[] = ["first", "second", "third"];
@@ -349,6 +351,7 @@ print(isInstance(user, User));
 print(isInstance(user, BaseName));
 print(importedStatus);
 print(importedText);
+print(File1.importedText);
 print(firstItem);
 print(profile);
 print(loadState);
@@ -366,6 +369,7 @@ logValue(42);
 logger.log("class overload");
 logger.log(7);
 logImportedText();
+File1.logImportedText();
 
 try {
   throw new AppError("App failed");
@@ -393,6 +397,22 @@ function logImportedText(): void {
 export importedText;
 export logImportedText;
 ```
+
+## Imports
+
+The language supports three import forms:
+
+```fast
+import File1 from "./file1";
+import { importedText } from "./file1";
+import File1, { importedText } from "./file1";
+```
+
+Rules:
+
+- the namespace import always comes first when combined with named imports
+- namespace members are accessed with `.`, like `File1.logImportedText()`
+- imported bindings remain immutable
 
 ## Switch
 

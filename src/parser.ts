@@ -784,8 +784,32 @@ export class Parser {
   }
 
   private parseImportDeclaration(): ImportDeclaration {
-    this.consume(TokenType.LeftBrace, "Expected '{' after 'import'.");
     const identifiers: Identifier[] = [];
+    let namespaceIdentifier: Identifier | undefined;
+
+    if (this.check(TokenType.Identifier)) {
+      namespaceIdentifier = this.createIdentifier(this.advance());
+
+      if (this.match(TokenType.Comma)) {
+        this.consume(TokenType.LeftBrace, "Expected '{' after namespace import comma.");
+      } else {
+        this.consume(TokenType.From, "Expected 'from' after namespace import.");
+        const source = this.consume(TokenType.String, "Expected module path string after 'from'.");
+        this.consume(TokenType.Semicolon, "Expected ';' after import declaration.");
+
+        return {
+          identifiers,
+          kind: 'ImportDeclaration',
+          namespaceIdentifier,
+          source: {
+            kind: 'StringLiteral',
+            value: source.lexeme,
+          },
+        };
+      }
+    } else {
+      this.consume(TokenType.LeftBrace, "Expected namespace identifier or '{' after 'import'.");
+    }
 
     do {
       const identifier = this.consume(TokenType.Identifier, 'Expected imported binding name.');
@@ -797,7 +821,7 @@ export class Parser {
     const source = this.consume(TokenType.String, "Expected module path string after 'from'.");
     this.consume(TokenType.Semicolon, "Expected ';' after import declaration.");
 
-    return {
+    const statement: ImportDeclaration = {
       identifiers,
       kind: 'ImportDeclaration',
       source: {
@@ -805,6 +829,12 @@ export class Parser {
         value: source.lexeme,
       },
     };
+
+    if (namespaceIdentifier !== undefined) {
+      statement.namespaceIdentifier = namespaceIdentifier;
+    }
+
+    return statement;
   }
 
   private parseLogicalAnd(): Expression {

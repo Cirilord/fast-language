@@ -180,6 +180,7 @@ export type ClassProperty = {
 export type ImportDeclaration = {
   identifiers: Identifier[];
   kind: 'ImportDeclaration';
+  namespaceIdentifier?: Identifier;
   source: StringLiteral;
 };
 

@@ -1,4 +1,4 @@
-import { importedText, logImportedText } from "./file1";
+import File1, { importedText, logImportedText } from "./file1";
 
 // Number types are declared on variables.
 var a: int = 30;
@@ -318,6 +318,7 @@ print(isInstance(user, User));
 print(isInstance(user, BaseName));
 print(importedStatus);
 print(importedText);
+print(File1.importedText);
 print(firstItem);
 print(profile);
 print(loadState);
@@ -337,6 +338,7 @@ logger.log("class overload");
 logger.log(7);
 logStatus("state");
 logImportedText();
+File1.logImportedText();
 
 try {
   throw new AppError("App failed");

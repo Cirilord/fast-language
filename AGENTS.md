@@ -92,6 +92,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Objects are created with `new Name()` and members are accessed with `.`.
 - `this` is available in constructors and methods, and `super()`/`super.method()` are available in subclasses.
 - Builtin error classes include `Error`, `TypeError`, and `ReferenceError`.
+- Namespace imports use `import File from "./file";`, and combined imports use `import File, { name } from "./file";`.
 - Named imports use `import { name } from "./file";` and resolve local `.fast` files.
 - Named exports can be inline, like `export var name = "Fast";`.
 - Enums use `enum Name { Member, Member }`, members are accessed like `Name.Member`, and enum values compare by equality and work in `switch`.

@@ -67,6 +67,12 @@ export type NativeFunctionValue = {
   type: 'native-function';
 };
 
+export type NamespaceValue = {
+  exports: RuntimeModuleExports;
+  name: string;
+  type: 'namespace';
+};
+
 export type EnumValue = {
   declaration: EnumDeclaration;
   members: Map<string, EnumMemberValue>;
@@ -153,6 +159,7 @@ export type RuntimeValue =
   | EnumValue
   | InstanceValue
   | NativeFunctionValue
+  | NamespaceValue
   | NullValue
   | NumberValue
   | StringValue
@@ -219,6 +226,8 @@ function areRuntimeValuesEqual(left: RuntimeValue, right: RuntimeValue): boolean
     case 'instance':
       return left === right;
     case 'native-function':
+      return left === right;
+    case 'namespace':
       return left === right;
     case 'function':
       return left === right;
@@ -1123,6 +1132,16 @@ export class Interpreter {
       throw createReferenceError(`Property '${propertyName}' is not defined`);
     }
 
+    if (object.type === 'namespace') {
+      const exportedValue = object.exports.get(propertyName);
+
+      if (exportedValue !== undefined) {
+        return exportedValue;
+      }
+
+      throw createReferenceError(`Module namespace '${object.name}' does not export '${propertyName}'`);
+    }
+
     if (object.type === 'instance') {
       if (propertyName === 'constructor') {
         return object.classValue;
@@ -1558,6 +1577,18 @@ export class Interpreter {
 
     const moduleExports = this.resolveImport(statement.source.value);
 
+    if (statement.namespaceIdentifier !== undefined) {
+      this.scope.define(
+        statement.namespaceIdentifier.name,
+        {
+          exports: moduleExports,
+          name: statement.namespaceIdentifier.name,
+          type: 'namespace',
+        },
+        false
+      );
+    }
+
     for (const identifier of statement.identifiers) {
       const value = moduleExports.get(identifier.name);
 
@@ -1874,6 +1905,8 @@ export class Interpreter {
         return 'object';
       case 'native-function':
         return 'function';
+      case 'namespace':
+        return 'namespace';
       case 'null':
         return 'null';
       case 'number':
@@ -1997,6 +2030,8 @@ export class Interpreter {
         return this.renderInstanceValue(value);
       case 'native-function':
         return `<native function ${value.name}>`;
+      case 'namespace':
+        return `<namespace ${value.name}>`;
       case 'function':
         return this.renderUserFunctionValue(value);
       case 'null':
