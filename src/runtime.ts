@@ -18,9 +18,9 @@ import type {
   FunctionDeclaration,
   FunctionReturnType,
   Identifier,
-  IndexExpression,
   IfStatement,
   ImportDeclaration,
+  IndexExpression,
   MemberExpression,
   NewExpression,
   NumberLiteral,
@@ -30,6 +30,7 @@ import type {
   ReturnStatement,
   Statement,
   StringLiteral,
+  SwitchStatement,
   ThrowStatement,
   TryStatement,
   TupleLiteral,
@@ -153,6 +154,8 @@ class ReturnSignal {
 class BreakSignal {}
 
 class ContinueSignal {}
+
+class FallthroughSignal {}
 
 class ThrowSignal {
   public constructor(public readonly value: RuntimeValue) {}
@@ -1316,6 +1319,10 @@ export class Interpreter {
     return value;
   }
 
+  private executeFallthroughStatement(): RuntimeValue {
+    throw new FallthroughSignal();
+  }
+
   private executeForStatement(statement: ForStatement): RuntimeValue {
     const iterable = this.evaluateExpression(statement.iterable);
     let lastValue: RuntimeValue = { type: 'null', value: null };
@@ -1456,6 +1463,8 @@ export class Interpreter {
         return this.executeContinueStatement();
       case 'DoWhileStatement':
         return this.executeDoWhileStatement(statement);
+      case 'FallthroughStatement':
+        return this.executeFallthroughStatement();
       case 'ThrowStatement':
         return this.executeThrowStatement(statement);
       case 'ExportDeclaration':
@@ -1472,6 +1481,8 @@ export class Interpreter {
         return this.executeImportDeclaration(statement);
       case 'ReturnStatement':
         return this.executeReturnStatement(statement);
+      case 'SwitchStatement':
+        return this.executeSwitchStatement(statement);
       case 'TryStatement':
         return this.executeTryStatement(statement);
       case 'VariableDeclaration':
@@ -1479,6 +1490,59 @@ export class Interpreter {
       case 'WhileStatement':
         return this.executeWhileStatement(statement);
     }
+  }
+
+  private executeSwitchStatement(statement: SwitchStatement): RuntimeValue {
+    const discriminant = this.evaluateExpression(statement.discriminant);
+    const clauses = statement.cases.map((caseClause) => ({
+      body: caseClause.body,
+      matches: (): boolean => areRuntimeValuesEqual(discriminant, this.evaluateExpression(caseClause.test)),
+    }));
+
+    if (statement.defaultBody !== undefined) {
+      clauses.push({
+        body: statement.defaultBody,
+        matches: (): boolean => true,
+      });
+    }
+
+    const startIndex = clauses.findIndex((clause) => clause.matches());
+
+    if (startIndex === -1) {
+      return { type: 'null', value: null };
+    }
+
+    let lastValue: RuntimeValue = { type: 'null', value: null };
+
+    for (let index = startIndex; index < clauses.length; index += 1) {
+      const clause = clauses[index];
+
+      if (clause === undefined) {
+        continue;
+      }
+
+      try {
+        lastValue = this.withScope(() => {
+          let bodyValue: RuntimeValue = { type: 'null', value: null };
+
+          for (const bodyStatement of clause.body) {
+            bodyValue = this.executeStatement(bodyStatement);
+          }
+
+          return bodyValue;
+        });
+
+        return lastValue;
+      } catch (error) {
+        if (error instanceof FallthroughSignal) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    return lastValue;
   }
 
   private executeThrowStatement(statement: ThrowStatement): RuntimeValue {
@@ -1492,7 +1556,7 @@ export class Interpreter {
   }
 
   private executeTryStatement(statement: TryStatement): RuntimeValue {
-    let completionSignal: BreakSignal | ContinueSignal | ReturnSignal | ThrowSignal | undefined;
+    let completionSignal: BreakSignal | ContinueSignal | FallthroughSignal | ReturnSignal | ThrowSignal | undefined;
     let lastValue: RuntimeValue = { type: 'null', value: null };
 
     try {
@@ -1508,7 +1572,10 @@ export class Interpreter {
     } catch (error) {
       if (!(error instanceof ThrowSignal)) {
         completionSignal =
-          error instanceof BreakSignal || error instanceof ContinueSignal || error instanceof ReturnSignal
+          error instanceof BreakSignal ||
+          error instanceof ContinueSignal ||
+          error instanceof FallthroughSignal ||
+          error instanceof ReturnSignal
             ? error
             : undefined;
 
@@ -1537,6 +1604,7 @@ export class Interpreter {
             if (
               exceptError instanceof BreakSignal ||
               exceptError instanceof ContinueSignal ||
+              exceptError instanceof FallthroughSignal ||
               exceptError instanceof ReturnSignal ||
               exceptError instanceof ThrowSignal
             ) {
@@ -1566,6 +1634,7 @@ export class Interpreter {
         if (
           finallyError instanceof BreakSignal ||
           finallyError instanceof ContinueSignal ||
+          finallyError instanceof FallthroughSignal ||
           finallyError instanceof ReturnSignal ||
           finallyError instanceof ThrowSignal
         ) {

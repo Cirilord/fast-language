@@ -45,6 +45,7 @@ Right now the project is implemented in TypeScript and already supports:
 - array index access like `items[0]`
 - `for ... of` loops with optional index binding
 - `if`, `else if`, and `else` with boolean conditions
+- `switch` statements with block-based `case` clauses, `default`, and explicit `fallthrough`
 - `break` and `continue` inside loops
 - `while` loops with boolean conditions
 - `do ... while` loops with boolean conditions
@@ -263,6 +264,31 @@ if (isType(status, "string")) {
   print("status has another type");
 }
 
+switch (status) {
+  case "enabled" {
+    print("switch enabled");
+    fallthrough;
+  }
+
+  case "disabled" {
+    print("switch handled");
+  }
+
+  default {
+    print("switch fallback");
+  }
+}
+
+switch (profile) {
+  case ("Cirilo", 30, 1.8) {
+    print("tuple switch match");
+  }
+
+  default {
+    print("tuple switch fallback");
+  }
+}
+
 print(result);
 print(directNegative);
 print(negative);
@@ -339,6 +365,35 @@ function logImportedText(): void {
 export importedText;
 export logImportedText;
 ```
+
+## Switch
+
+`switch` compares runtime equality for `string`, `int`, `float`, `double`, `boolean`, `null`, and tuple values.
+
+```fast
+switch (status) {
+  case "enabled" {
+    print("enabled");
+    fallthrough;
+  }
+
+  case "disabled" {
+    print("handled");
+  }
+
+  default {
+    print("fallback");
+  }
+}
+```
+
+Rules:
+
+- every `case` and `default` clause must use a block
+- `fallthrough;` is explicit
+- `fallthrough;` must be the final top-level statement in a `case`
+- `fallthrough;` cannot appear inside `if`, loops, `try`, or nested blocks
+- the final switch clause cannot use `fallthrough;`
 
 ## Overloads
 

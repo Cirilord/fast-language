@@ -19,13 +19,14 @@ import type {
   ExportDeclaration,
   Expression,
   ExpressionStatement,
+  FallthroughStatement,
   ForStatement,
   FunctionDeclaration,
   FunctionReturnType,
   Identifier,
-  IndexExpression,
   IfStatement,
   ImportDeclaration,
+  IndexExpression,
   MemberExpression,
   NewExpression,
   NullLiteral,
@@ -35,6 +36,8 @@ import type {
   ReturnStatement,
   Statement,
   StringLiteral,
+  SwitchCase,
+  SwitchStatement,
   ThrowStatement,
   TryStatement,
   TupleLiteral,
@@ -561,6 +564,14 @@ export class Parser {
     return expression;
   }
 
+  private parseFallthroughStatement(): FallthroughStatement {
+    this.consume(TokenType.Semicolon, "Expected ';' after fallthrough.");
+
+    return {
+      kind: 'FallthroughStatement',
+    };
+  }
+
   private parseForStatement(): ForStatement {
     this.consume(TokenType.LeftParen, "Expected '(' after 'for'.");
     this.consume(TokenType.Var, "Expected 'var' in for loop declaration.");
@@ -898,6 +909,10 @@ export class Parser {
       return this.parseContinueStatement();
     }
 
+    if (this.match(TokenType.Fallthrough)) {
+      return this.parseFallthroughStatement();
+    }
+
     if (this.match(TokenType.Abstract)) {
       return this.parseClassDeclaration(true);
     }
@@ -912,6 +927,10 @@ export class Parser {
 
     if (this.match(TokenType.Throw)) {
       return this.parseThrowStatement();
+    }
+
+    if (this.match(TokenType.Switch)) {
+      return this.parseSwitchStatement();
     }
 
     if (this.match(TokenType.Try)) {
@@ -937,6 +956,62 @@ export class Parser {
       expression,
       kind: 'ExpressionStatement',
     } satisfies ExpressionStatement;
+  }
+
+  private parseSwitchCase(): SwitchCase {
+    const test = this.parseExpression();
+
+    return {
+      body: this.parseBlockStatement(),
+      kind: 'SwitchCase',
+      test,
+    };
+  }
+
+  private parseSwitchStatement(): SwitchStatement {
+    this.consume(TokenType.LeftParen, "Expected '(' after 'switch'.");
+    const discriminant = this.parseExpression();
+    this.consume(TokenType.RightParen, "Expected ')' after switch expression.");
+    this.consume(TokenType.LeftBrace, "Expected '{' before switch body.");
+
+    const cases: SwitchCase[] = [];
+    let defaultBody: Statement[] | undefined;
+
+    while (!this.check(TokenType.RightBrace) && !this.isAtEnd()) {
+      if (this.match(TokenType.Case)) {
+        if (defaultBody !== undefined) {
+          throw this.error(this.previous(), "'default' must be the last switch clause.");
+        }
+
+        cases.push(this.parseSwitchCase());
+        continue;
+      }
+
+      if (this.match(TokenType.Default)) {
+        if (defaultBody !== undefined) {
+          throw this.error(this.previous(), "Switch statement can only have one 'default' clause.");
+        }
+
+        defaultBody = this.parseBlockStatement();
+        continue;
+      }
+
+      throw this.error(this.peek(), "Expected 'case' or 'default' inside switch statement.");
+    }
+
+    this.consume(TokenType.RightBrace, "Expected '}' after switch body.");
+
+    const statement: SwitchStatement = {
+      cases,
+      discriminant,
+      kind: 'SwitchStatement',
+    };
+
+    if (defaultBody !== undefined) {
+      statement.defaultBody = defaultBody;
+    }
+
+    return statement;
   }
 
   private parseTerm(): Expression {

@@ -19,9 +19,9 @@ import type {
   FunctionDeclaration,
   FunctionReturnType,
   Identifier,
-  IndexExpression,
   IfStatement,
   ImportDeclaration,
+  IndexExpression,
   MemberExpression,
   NewExpression,
   NumberLiteral,
@@ -30,6 +30,8 @@ import type {
   Program,
   ReturnStatement,
   Statement,
+  SwitchCase,
+  SwitchStatement,
   ThrowStatement,
   TryStatement,
   TupleLiteral,
@@ -122,6 +124,26 @@ function isArrayType(type: SemanticType): boolean {
 
 function isTupleType(type: SemanticType): boolean {
   return typeof type === 'string' && type.startsWith('(') && type.endsWith(')');
+}
+
+function isSwitchComparableType(type: SemanticType): boolean {
+  return type === 'boolean' || type === 'null' || type === 'string' || isNumericType(type) || isTupleType(type);
+}
+
+function canSwitchCompareTypes(leftType: SemanticType, rightType: SemanticType): boolean {
+  if (leftType === 'unknown' || rightType === 'unknown') {
+    return true;
+  }
+
+  if (leftType === 'null' || rightType === 'null') {
+    return true;
+  }
+
+  if (isNumericType(leftType) && isNumericType(rightType)) {
+    return true;
+  }
+
+  return leftType === rightType;
 }
 
 function splitTopLevel(content: string): string[] {
@@ -486,6 +508,7 @@ class SemanticScope {
 }
 
 export class SemanticAnalyzer {
+  private allowFallthroughStatement = false;
   private currentClass: ClassDeclaration | undefined;
   private currentReturnType: FunctionReturnType | undefined;
   private readonly exports = new Map<string, SemanticSymbol>();
@@ -1304,6 +1327,12 @@ export class SemanticAnalyzer {
     this.analyzeExpression(statement.expression);
   }
 
+  private analyzeFallthroughStatement(): void {
+    if (!this.allowFallthroughStatement) {
+      throw createSyntaxError("'fallthrough' can only be used as the final top-level statement in a switch case");
+    }
+  }
+
   private analyzeForStatement(statement: ForStatement): void {
     const iterableType = this.analyzeExpression(statement.iterable);
 
@@ -1842,6 +1871,9 @@ export class SemanticAnalyzer {
       case 'DoWhileStatement':
         this.analyzeDoWhileStatement(statement);
         return;
+      case 'FallthroughStatement':
+        this.analyzeFallthroughStatement();
+        return;
       case 'ThrowStatement':
         this.analyzeThrowStatement(statement);
         return;
@@ -1865,6 +1897,9 @@ export class SemanticAnalyzer {
         return;
       case 'ReturnStatement':
         this.analyzeReturnStatement(statement);
+        return;
+      case 'SwitchStatement':
+        this.analyzeSwitchStatement(statement);
         return;
       case 'TryStatement':
         this.analyzeTryStatement(statement);
@@ -1890,6 +1925,71 @@ export class SemanticAnalyzer {
     }
 
     return currentClass.baseClass.name;
+  }
+
+  private analyzeSwitchCase(caseClause: SwitchCase, discriminantType: SemanticType, canFallthrough: boolean): void {
+    const caseType = this.analyzeExpression(caseClause.test);
+
+    if (!isSwitchComparableType(caseType) && caseType !== 'unknown') {
+      throw createTypeError(`Switch case value must be a string, number, boolean, null, or tuple, got '${caseType}'`);
+    }
+
+    if (!canSwitchCompareTypes(discriminantType, caseType)) {
+      throw createTypeError(
+        `Switch case value of type '${caseType}' is not compatible with switch value of type '${discriminantType}'`
+      );
+    }
+
+    this.analyzeSwitchClauseBody(caseClause.body, canFallthrough);
+  }
+
+  private analyzeSwitchClauseBody(statements: Statement[], canFallthrough: boolean): void {
+    if (statements.length === 0) {
+      return;
+    }
+
+    this.withScope(() => {
+      for (const [index, statement] of statements.entries()) {
+        if (statement.kind === 'FallthroughStatement') {
+          if (index !== statements.length - 1) {
+            throw createSyntaxError("'fallthrough' must be the last statement in a switch case");
+          }
+
+          if (!canFallthrough) {
+            throw createSyntaxError("Cannot use 'fallthrough' in the final switch clause");
+          }
+        }
+
+        const previousAllowFallthroughStatement = this.allowFallthroughStatement;
+        this.allowFallthroughStatement = statement.kind === 'FallthroughStatement';
+
+        try {
+          this.analyzeStatement(statement);
+        } finally {
+          this.allowFallthroughStatement = previousAllowFallthroughStatement;
+        }
+      }
+    });
+  }
+
+  private analyzeSwitchStatement(statement: SwitchStatement): void {
+    const discriminantType = this.analyzeExpression(statement.discriminant);
+    const hasDefault = statement.defaultBody !== undefined;
+
+    if (!isSwitchComparableType(discriminantType) && discriminantType !== 'unknown') {
+      throw createTypeError(
+        `Switch value must be a string, number, boolean, null, or tuple, got '${discriminantType}'`
+      );
+    }
+
+    for (const [index, caseClause] of statement.cases.entries()) {
+      const canFallthrough = index < statement.cases.length - 1 || hasDefault;
+      this.analyzeSwitchCase(caseClause, discriminantType, canFallthrough);
+    }
+
+    if (statement.defaultBody !== undefined) {
+      this.analyzeSwitchClauseBody(statement.defaultBody, false);
+    }
   }
 
   private analyzeThisExpression(): SemanticType {
@@ -2733,6 +2833,16 @@ export class SemanticAnalyzer {
         }
 
         if (statement.finallyBody !== undefined && this.hasReturnStatement(statement.finallyBody)) {
+          return true;
+        }
+      }
+
+      if (statement.kind === 'SwitchStatement') {
+        if (statement.cases.some((caseClause) => this.hasReturnStatement(caseClause.body))) {
+          return true;
+        }
+
+        if (statement.defaultBody !== undefined && this.hasReturnStatement(statement.defaultBody)) {
           return true;
         }
       }

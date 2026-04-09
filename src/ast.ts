@@ -9,6 +9,7 @@ export type Statement =
   | ClassDeclaration
   | ContinueStatement
   | DoWhileStatement
+  | FallthroughStatement
   | IfStatement
   | ThrowStatement
   | ExportDeclaration
@@ -17,6 +18,7 @@ export type Statement =
   | FunctionDeclaration
   | ImportDeclaration
   | ReturnStatement
+  | SwitchStatement
   | TryStatement
   | VariableDeclaration
   | WhileStatement;
@@ -45,6 +47,10 @@ export type ContinueStatement = {
   kind: 'ContinueStatement';
 };
 
+export type FallthroughStatement = {
+  kind: 'FallthroughStatement';
+};
+
 export type ForStatement = {
   body: Statement[];
   element: Identifier;
@@ -67,6 +73,19 @@ export type IfStatement = {
 };
 
 export type ElseBranch = IfStatement | Statement[];
+
+export type SwitchCase = {
+  body: Statement[];
+  kind: 'SwitchCase';
+  test: Expression;
+};
+
+export type SwitchStatement = {
+  cases: SwitchCase[];
+  defaultBody?: Statement[];
+  discriminant: Expression;
+  kind: 'SwitchStatement';
+};
 
 export type ThrowStatement = {
   kind: 'ThrowStatement';

@@ -234,6 +234,28 @@ if (!(isType(status, "string") && isType(importedText, "string"))) {
   logStringValue(importedText);
 }
 
+switch (status) {
+  case "enabled" {
+    print("switch enabled");
+    fallthrough;
+  }
+  case "disabled" {
+    print("switch handled");
+  }
+  default {
+    print("switch fallback");
+  }
+}
+
+switch (profile) {
+  case ("Cirilo", 30, 1.8) {
+    print("tuple switch match");
+  }
+  default {
+    print("tuple switch fallback");
+  }
+}
+
 a = 50;
 
 print(a);

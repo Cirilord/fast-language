@@ -188,7 +188,7 @@
         },
         {
           "name": "keyword.control.conditional.ts",
-          "match": "\\b(?:else|if)\\b"
+          "match": "\\b(?:case|default|else|if|switch)\\b"
         },
         {
           "name": "keyword.control.exception.ts",
@@ -204,7 +204,7 @@
         },
         {
           "name": "keyword.control.flow.ts",
-          "match": "\\b(?:break|continue|return)\\b"
+          "match": "\\b(?:break|continue|fallthrough|return)\\b"
         },
         {
           "name": "keyword.control.ts",
