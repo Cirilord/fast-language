@@ -7,6 +7,8 @@ import type {
   BinaryOperator,
   BreakStatement,
   CallExpression,
+  ClassicForClause,
+  ClassicForStatement,
   ClassConstructor,
   ClassDeclaration,
   ClassMember,
@@ -216,6 +218,18 @@ export class Parser {
 
     const value = this.parseExpression();
     this.consume(TokenType.Semicolon, "Expected ';' after assignment.");
+
+    return {
+      kind: 'AssignmentStatement',
+      operator: operator.lexeme as AssignmentOperator,
+      target,
+      value,
+    };
+  }
+
+  private parseAssignmentStatementWithoutTerminator(target: AssignmentTarget): AssignmentStatement {
+    const operator = this.consumeAssignmentOperator();
+    const value = this.parseExpression();
 
     return {
       kind: 'AssignmentStatement',
@@ -629,6 +643,93 @@ export class Parser {
     return forStatement;
   }
 
+  private parseClassicForClause(): ClassicForClause {
+    if (this.match(TokenType.Var)) {
+      return this.parseVariableDeclaration('var', false);
+    }
+
+    if (this.match(TokenType.Val)) {
+      return this.parseVariableDeclaration('val', false);
+    }
+
+    const expression = this.parseExpression();
+
+    if (
+      (expression.kind === 'Identifier' || expression.kind === 'MemberExpression') &&
+      this.isAssignmentOperatorToken(this.peek().type)
+    ) {
+      return this.parseAssignmentStatementWithoutTerminator(expression);
+    }
+
+    return {
+      expression,
+      kind: 'ExpressionStatement',
+    } satisfies ExpressionStatement;
+  }
+
+  private parseClassicForIncrement(): AssignmentStatement | ExpressionStatement {
+    const expression = this.parseExpression();
+
+    if (
+      (expression.kind === 'Identifier' || expression.kind === 'MemberExpression') &&
+      this.isAssignmentOperatorToken(this.peek().type)
+    ) {
+      return this.parseAssignmentStatementWithoutTerminator(expression);
+    }
+
+    return {
+      expression,
+      kind: 'ExpressionStatement',
+    } satisfies ExpressionStatement;
+  }
+
+  private parseForLoopStatement(): ClassicForStatement | ForStatement {
+    this.consume(TokenType.LeftParen, "Expected '(' after 'for'.");
+
+    if (this.check(TokenType.Var)) {
+      const start = this.current;
+      this.advance();
+      this.consume(TokenType.Identifier, 'Expected element identifier in for loop.');
+
+      if (this.match(TokenType.Comma)) {
+        this.consume(TokenType.Identifier, "Expected index identifier after ','.");
+      }
+
+      if (this.match(TokenType.Of)) {
+        this.current = start - 1;
+        return this.parseForStatement();
+      }
+
+      this.current = start;
+    }
+
+    const statement: ClassicForStatement = {
+      body: [],
+      kind: 'ClassicForStatement',
+    };
+
+    if (!this.check(TokenType.Semicolon)) {
+      statement.initializer = this.parseClassicForClause();
+    }
+
+    this.consume(TokenType.Semicolon, "Expected ';' after for initializer.");
+
+    if (!this.check(TokenType.Semicolon)) {
+      statement.condition = this.parseExpression();
+    }
+
+    this.consume(TokenType.Semicolon, "Expected ';' after for condition.");
+
+    if (!this.check(TokenType.RightParen)) {
+      statement.increment = this.parseClassicForIncrement();
+    }
+
+    this.consume(TokenType.RightParen, "Expected ')' after for clauses.");
+    statement.body = this.parseBlockStatement();
+
+    return statement;
+  }
+
   private parseFunctionDeclaration(): FunctionDeclaration {
     const name = this.consume(TokenType.Identifier, "Expected function name after 'function'.");
     const typeParameters = this.parseTypeParameters();
@@ -917,7 +1018,7 @@ export class Parser {
     }
 
     if (this.match(TokenType.For)) {
-      return this.parseForStatement();
+      return this.parseForLoopStatement();
     }
 
     if (this.match(TokenType.Do)) {
@@ -1185,13 +1286,15 @@ export class Parser {
     return this.parseCallExpression();
   }
 
-  private parseVariableDeclaration(declarationType: 'var' | 'val'): VariableDeclaration {
+  private parseVariableDeclaration(declarationType: 'var' | 'val', expectSemicolon = true): VariableDeclaration {
     const name = this.consume(TokenType.Identifier, `Expected identifier after '${declarationType}'.`);
     const type = this.match(TokenType.Colon) ? this.parseTypeName() : undefined;
 
     this.consume(TokenType.Equals, "Expected '=' after variable name.");
     const initializer = this.parseExpression();
-    this.consume(TokenType.Semicolon, "Expected ';' after variable declaration.");
+    if (expectSemicolon) {
+      this.consume(TokenType.Semicolon, "Expected ';' after variable declaration.");
+    }
 
     const declaration: VariableDeclaration = {
       declarationType,

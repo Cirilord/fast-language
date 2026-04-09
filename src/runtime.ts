@@ -5,6 +5,7 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  ClassicForStatement,
   ClassConstructor,
   ClassDeclaration,
   ClassMethod,
@@ -1310,6 +1311,56 @@ export class Interpreter {
     return this.scope.define(statement.identifier.name, classValue, false);
   }
 
+  private executeClassicForStatement(statement: ClassicForStatement): RuntimeValue {
+    let lastValue: RuntimeValue = { type: 'null', value: null };
+
+    return this.withScope(() => {
+      if (statement.initializer !== undefined) {
+        lastValue = this.executeStatement(statement.initializer);
+      }
+
+      while (true) {
+        if (statement.condition !== undefined) {
+          const condition = this.evaluateExpression(statement.condition);
+
+          if (condition.type !== 'boolean') {
+            throw createTypeError('For condition must be a boolean');
+          }
+
+          if (!condition.value) {
+            break;
+          }
+        }
+
+        try {
+          lastValue = this.withScopeFrom(this.scope, () => {
+            let bodyValue: RuntimeValue = { type: 'null', value: null };
+
+            for (const bodyStatement of statement.body) {
+              bodyValue = this.executeStatement(bodyStatement);
+            }
+
+            return bodyValue;
+          });
+        } catch (error) {
+          if (error instanceof BreakSignal) {
+            break;
+          }
+
+          if (!(error instanceof ContinueSignal)) {
+            throw error;
+          }
+        }
+
+        if (statement.increment !== undefined) {
+          lastValue = this.executeStatement(statement.increment);
+        }
+      }
+
+      return lastValue;
+    });
+  }
+
   private executeEnumDeclaration(statement: EnumDeclaration): RuntimeValue {
     const enumValue = this.createEnumValue(statement);
     return this.scope.define(statement.identifier.name, enumValue, false);
@@ -1511,6 +1562,8 @@ export class Interpreter {
         return this.executeAssignmentStatement(statement);
       case 'BreakStatement':
         return this.executeBreakStatement();
+      case 'ClassicForStatement':
+        return this.executeClassicForStatement(statement);
       case 'ClassDeclaration':
         return this.executeClassDeclaration(statement);
       case 'ContinueStatement':

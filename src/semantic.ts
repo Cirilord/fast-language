@@ -5,6 +5,7 @@ import type {
   BinaryExpression,
   BinaryOperator,
   CallExpression,
+  ClassicForStatement,
   ClassConstructor,
   ClassDeclaration,
   ClassMethod,
@@ -1418,6 +1419,34 @@ export class SemanticAnalyzer {
     });
   }
 
+  private analyzeClassicForStatement(statement: ClassicForStatement): void {
+    this.withLoop(() => {
+      this.withScope(() => {
+        if (statement.initializer !== undefined) {
+          this.analyzeStatement(statement.initializer);
+        }
+
+        if (statement.condition !== undefined) {
+          const conditionType = this.analyzeExpression(statement.condition);
+
+          if (conditionType !== 'boolean' && conditionType !== 'unknown') {
+            throw createTypeError(`For condition must be a boolean, got '${conditionType}'`);
+          }
+        }
+
+        this.withScope(() => {
+          for (const bodyStatement of statement.body) {
+            this.analyzeStatement(bodyStatement);
+          }
+        });
+
+        if (statement.increment !== undefined) {
+          this.analyzeStatement(statement.increment);
+        }
+      });
+    });
+  }
+
   private analyzeFunctionDeclaration(statement: FunctionDeclaration): void {
     if (containsUnknownType(statement.returnType)) {
       throw createTypeError(
@@ -1919,6 +1948,9 @@ export class SemanticAnalyzer {
         return;
       case 'BreakStatement':
         this.analyzeBreakStatement();
+        return;
+      case 'ClassicForStatement':
+        this.analyzeClassicForStatement(statement);
         return;
       case 'ClassDeclaration':
         this.analyzeClassDeclaration(statement);
@@ -2867,7 +2899,8 @@ export class SemanticAnalyzer {
       }
 
       if (
-        (statement.kind === 'DoWhileStatement' ||
+        (statement.kind === 'ClassicForStatement' ||
+          statement.kind === 'DoWhileStatement' ||
           statement.kind === 'IfStatement' ||
           statement.kind === 'ForStatement' ||
           statement.kind === 'WhileStatement') &&

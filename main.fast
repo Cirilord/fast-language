@@ -199,6 +199,10 @@ for (var item, index of items) {
   print(item);
 }
 
+for (var classicIndex: int = 0; classicIndex < 3; classicIndex += 1) {
+  print(classicIndex);
+}
+
 while (counter < 3) {
   if (counter == 1) {
     counter += 1;

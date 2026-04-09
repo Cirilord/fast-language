@@ -45,6 +45,7 @@ Right now the project is implemented in TypeScript and already supports:
 - array literals with `[value, value]`
 - array index access like `items[0]`
 - `for ... of` loops with optional index binding
+- classic `for` loops with initializer, condition, and increment
 - `if`, `else if`, and `else` with boolean conditions
 - `switch` statements with block-based `case` clauses, `default`, and explicit `fallthrough`
 - `break` and `continue` inside loops
@@ -235,6 +236,10 @@ nullableText ??= "Fallback text";
 for (var item, index of items) {
   print(index);
   print(item);
+}
+
+for (var classicIndex: int = 0; classicIndex < 3; classicIndex += 1) {
+  print(classicIndex);
 }
 
 while (counter < 3) {
@@ -579,6 +584,7 @@ Then open a `.fast` file in the extension development window.
 - tuple types use `(T1, T2, ...)` and tuple literals use `(value1, value2, ...)`
 - `for` loops use `for (var element of array) { ... }`
 - `for` loops can access index with `for (var element, index of array) { ... }`
+- classic `for` loops use `for (initializer; condition; increment) { ... }`
 - `break` and `continue` can only be used inside `for`, `while`, and `do while`
 - `while` loops use `while (condition) { ... }` and the condition must be boolean
 - `do while` loops use `do { ... } while (condition);` and the condition must be boolean

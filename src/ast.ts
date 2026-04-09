@@ -6,6 +6,7 @@ export type Program = {
 export type Statement =
   | AssignmentStatement
   | BreakStatement
+  | ClassicForStatement
   | ClassDeclaration
   | ContinueStatement
   | DoWhileStatement
@@ -58,6 +59,16 @@ export type ForStatement = {
   index?: Identifier;
   iterable: Expression;
   kind: 'ForStatement';
+};
+
+export type ClassicForClause = AssignmentStatement | ExpressionStatement | VariableDeclaration;
+
+export type ClassicForStatement = {
+  body: Statement[];
+  condition?: Expression;
+  increment?: AssignmentStatement | ExpressionStatement;
+  initializer?: ClassicForClause;
+  kind: 'ClassicForStatement';
 };
 
 export type DoWhileStatement = {

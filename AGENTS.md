@@ -44,6 +44,7 @@ This file tracks working conventions for the `fast` language project so future c
 - Tuple types use `(T1, T2, ...)`, and tuple literals use `(value1, value2, ...)`.
 - `for` loops use `for (var element of array) { ... }`.
 - `for` loops can access index with `for (var element, index of array) { ... }`.
+- Classic `for` loops use `for (initializer; condition; increment) { ... }`.
 - `if` statements use `if (condition) { ... }`, `else if (condition) { ... }`, and `else { ... }`, and each condition must be boolean.
 - `switch` statements use `switch (value) { case value { ... } default { ... } }`, compare runtime equality for strings, numbers, booleans, `null`, and tuples, and require blocks for every clause.
 - `fallthrough;` is explicit inside `switch`, only valid as the final top-level statement of a `case`, and cannot be nested inside `if`, loops, or `try`.
